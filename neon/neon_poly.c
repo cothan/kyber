@@ -1,10 +1,13 @@
 #include <arm_neon.h>
+#include "params.h"
+#include "poly.h"
+
 
 // Load int16x8x4_t c <= ptr*
 #define vload(c, ptr) c = vld1q_s16_x4(ptr);
 
 // Load int16x8x4_t c <= ptr*
-#define vstore(c, ptr) vst1q_s16_x4(ptr, c);
+#define vstore(ptr, c) vst1q_s16_x4(ptr, c);
 
 // Combine in16x8_t c: low | high
 #define vcombine(c, low, high) c = vcombine_s16(low, high);
@@ -55,8 +58,9 @@ int16_t barrett_reduce(int16_t a) {
 
 
 void neon_poly_reduce(poly *c) {
-  int16x8x4_t cc;                                                   // 4
-  int16x8_t neon_kyberq16, neon_v;                                  // 2
+  int16x8x4_t cc, aa;                                                   // 4
+  int16x8_t neon_kyberq16;                                  // 2
+  int16x4_t neon_v;
   int16x4_t t0_lo, t0_hi, t1_lo, t1_hi, t2_lo, t2_hi, t3_lo, t3_hi; // 8
   int32x4_t t01, t02, t11, t12, t21, t22, t31, t32;                 // 8
 
@@ -86,7 +90,8 @@ c = reduce(c)
 */
 void neon_poly_add_reduce(poly *c, const poly *a) {
   int16x8x4_t cc, aa;                                               // 8
-  int16x8_t neon_kyberq16, neon_v;                                  // 2
+  int16x8_t neon_kyberq16;                                  // 2
+  int16x4_t neon_v;
   int16x4_t t0_lo, t0_hi, t1_lo, t1_hi, t2_lo, t2_hi, t3_lo, t3_hi; // 8
   int32x4_t t01, t02, t11, t12, t21, t22, t31, t32;                 // 8
 
@@ -123,7 +128,8 @@ c = reduce(c)
 */
 void neon_poly_sub_reduce(poly *c, const poly *a) {
   int16x8x4_t cc, aa;                                               // 8
-  int16x8_t neon_kyberq16, neon_v;                                  // 2
+  int16x8_t neon_kyberq16;
+  int16x4_t neon_v;                                  // 2
   int16x4_t t0_lo, t0_hi, t1_lo, t1_hi, t2_lo, t2_hi, t3_lo, t3_hi; // 8
   int32x4_t t01, t02, t11, t12, t21, t22, t31, t32;                 // 8
 
@@ -158,9 +164,10 @@ void neon_poly_sub_reduce(poly *c, const poly *a) {
 c = c + a + b
 c = reduce(c)
 */
-void neon_poly_add_add_reduce_enc(poly *c, const poly *a, const poly *b) {
+void neon_poly_add_add_reduce(poly *c, const poly *a, const poly *b) {
   int16x8x4_t cc, aa, bb;                                           // 12
-  int16x8_t neon_kyberq16, neon_v;                                  // 2
+  int16x8_t neon_kyberq16;
+  int16x4_t neon_v;                                  // 2
   int16x4_t t0_lo, t0_hi, t1_lo, t1_hi, t2_lo, t2_hi, t3_lo, t3_hi; // 8
   int32x4_t t01, t02, t11, t12, t21, t22, t31, t32;                 // 8
 

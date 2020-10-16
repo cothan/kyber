@@ -1,13 +1,12 @@
 #include <arm_neon.h>
 #include "params.h"
+#include "reduce.h"
 #include "ntt.h"
 #include "polyvec.h"
 
 void neon_polyvec_ntt(polyvec *r)
 {
   unsigned int i;
-  // Enable reduce
-  const int reduce = 1;
   for(i=0;i<KYBER_K;i++)
   {
     neon_ntt(&r->vec[i]);
@@ -28,7 +27,7 @@ void neon_polyvec_add_reduce(polyvec *c, const polyvec *a) {
   for (i = 0; i < KYBER_K; i++) {
     // c = c + a;
     // c = reduce(c);
-    neon_poly_add_reduce(c->vec[i], a->vec[i]);
+    neon_poly_add_reduce(&c->vec[i], &a->vec[i]);
   }
 }
 
@@ -39,13 +38,13 @@ void neon_polyvec_add_reduce(polyvec *c, const polyvec *a) {
 #define vload(c, ptr) c = vld1q_s16_x4(ptr);
 
 // Load int16x8x4_t c <= ptr*
-#define vstore(c, ptr) vst1q_s16_x4(ptr, c);
+#define vstore(ptr, c) vst1q_s16_x4(ptr, c);
 
 // Load int16x8x2_t c <= ptr*
 #define vload16(c, ptr) c = vld1q_s16_x2(ptr);
 
 // Load int16x8x2_t c <= ptr*
-#define vstore16(c, ptr) vst1q_s16_x2(ptr, c);
+#define vstore16(ptr, c) vst1q_s16_x2(ptr, c);
 
 // Load int16x8_t c <= ptr*
 #define vload8(c, ptr) c = vld1q_s16(ptr);
@@ -178,7 +177,6 @@ out2: 1, 5, 9, d | 3, 7, b, f
 
 
 void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, const int to_mont) {
-  unsigned int i;
 
   int16x8x2_t aa[KYBER_K], bb[KYBER_K]; // Min 4=2x2, Max 8=4x2
   int16x8_t ta1, ta2, ta3, ta4, tb1, tb2, tb3, tb4, tc1, tc2, tc3, tc4; // 12
@@ -187,7 +185,8 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
             tb4_lo, tb4_hi, 
             ta3_lo, ta3_hi, 
             ta4_lo, ta4_hi;                                             // 8
-  int16x4_t neon_zeta, neon_one, neon_v;                                // 3
+  int16x4_t neon_zeta, neon_one, neon_v, 
+            neon_zeta_positive, neon_zeta_negative;                     // 3
   int32x4_t t1, t2, t3, t4;                                             // 4
   int32x4_t neon_qinv, neon_kyberq;                                     // 2
 
@@ -199,7 +198,7 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
   neon_one = vdup_n_s16(1);
 
   // Scalar variable
-  uint8_t k = 64;
+  unsigned int k = 64, i, j;
   // End
 
   // Total possible register: 30 = 8 + 12 + 4 + 4 + 4 + 2
@@ -208,17 +207,17 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
 
     // Load Zeta
     // 64, 65, 66, 67
-    vload4(neon_zeta_positive1, &zetas[k]);
+    vload4(neon_zeta_positive, &zetas[k]);
     // Convert zeta to negative sign
     // -64, -64, -66, -67
-    vnot4(neon_zeta_negative1, neon_zeta_positive1);
-    vadd4(neon_zeta_negative1, neon_one);
+    vnot4(neon_zeta_negative, neon_zeta_positive);
+    vadd4(neon_zeta_negative, neon_zeta_negative, neon_one);
     k += 4;
 
     for (i = 0; i < KYBER_K; i++) {
       // Use 8 registers
-      aa[i] = vld2q_s16(&a->vec[i]->coeffs[j]);
-      bb[i] = vld2q_s16(&b->vec[i]->coeffs[j]);
+      aa[i] = vld2q_s16(&a->vec[i].coeffs[j]);
+      bb[i] = vld2q_s16(&b->vec[i].coeffs[j]);
 
       // Tranpose before multiply
       transpose(ta1, ta2, aa[i].val[0], aa[i].val[1]);
@@ -259,8 +258,8 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
       // ta4[4:8] x tb4[4:8] x zeta_negative
       fqmul(ta4_lo, tb4_lo, t1, t2, t3, neon_qinv, neon_kyberq);
       fqmul(ta4_hi, tb4_hi, t1, t2, t3, neon_qinv, neon_kyberq);
-      fqmul(ta4_lo, zeta_positive, t1, t2, t3, neon_qinv, neon_kyberq);
-      fqmul(ta4_hi, zeta_negative, t1, t2, t3, neon_qinv, neon_kyberq);
+      fqmul(ta4_lo, neon_zeta_positive, t1, t2, t3, neon_qinv, neon_kyberq);
+      fqmul(ta4_hi, neon_zeta_negative, t1, t2, t3, neon_qinv, neon_kyberq);
       vcombine(tc4, ta4_lo, tb4_hi);
 
       // tc1 = tc3 + tc4

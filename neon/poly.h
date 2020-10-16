@@ -55,7 +55,7 @@ void neon_poly_reduce(poly *c);
 void neon_poly_add_reduce(poly *c, const poly *a);
 #define neon_poly_sub_reduce KYBER_NAMESPACE(_neon_poly_sub_reduce)
 void neon_poly_sub_reduce(poly *c, const poly *a);
-#define neon_poly_add_add_reduce_enc KYBER_NAMESPACE(_neon_poly_add_add_reduce_enc)
-void neon_poly_add_add_reduce_enc(poly *c, const poly *a, const poly *b);
+#define neon_poly_add_add_reduce KYBER_NAMESPACE(_neon_poly_add_add_reduce)
+void neon_poly_add_add_reduce(poly *c, const poly *a, const poly *b);
 
 #endif
