@@ -9,7 +9,7 @@ void neon_polyvec_ntt(polyvec *r)
   unsigned int i;
   for(i=0;i<KYBER_K;i++)
   {
-    neon_ntt(&r->vec[i]);
+    neon_ntt(r->vec[i].coeffs);
     neon_poly_reduce(&r->vec[i]);
   }
 }
@@ -18,7 +18,7 @@ void neon_polyvec_invntt_to_mont(polyvec *r)
 {
   unsigned int i;
   for(i=0;i<KYBER_K;i++)
-    neon_invntt(&r->vec[i]);
+    neon_invntt(r->vec[i].coeffs);
 }
 
 
