@@ -10,6 +10,7 @@
 #include "polyvec.h"
 #include "cpucycles.h"
 #include "speed_print.h"
+#include "ntt.h"
 
 #define NTESTS 10000
 
@@ -49,13 +50,13 @@ int main()
 
   for(i=0;i<NTESTS;i++) {
     t[i] = cpucycles();
-    poly_ntt(&ap);
+    neon_ntt(ap.coeffs);
   }
   print_results("NTT: ", t, NTESTS);
 
   for(i=0;i<NTESTS;i++) {
     t[i] = cpucycles();
-    poly_invntt_tomont(&ap);
+    neon_invntt(ap.coeffs);
   }
   print_results("INVNTT: ", t, NTESTS);
 
