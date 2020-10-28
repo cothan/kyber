@@ -6,4 +6,5 @@ tvecs768
 tvecs768-90s
 *.req
 *.rsp
+*.out.*
 neon/params.h
