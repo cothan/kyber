@@ -10,7 +10,7 @@ void neon_polyvec_ntt(polyvec *r)
   for(i=0;i<KYBER_K;i++)
   {
     neon_ntt(r->vec[i].coeffs);
-    // neon_poly_reduce(&r->vec[i]);
+    neon_poly_reduce(&r->vec[i]);
   }
 }
 
@@ -32,37 +32,17 @@ void neon_polyvec_add_reduce(polyvec *c, const polyvec *a) {
 }
 
 /******8888888888888888888888888***************/
-// ! Clean this up 
-
-// Load int16x8x4_t c <= ptr*
-#define vload(c, ptr) c = vld1q_s16_x4(ptr);
-
-// Load int16x8x4_t c <= ptr*
-#define vstore(ptr, c) vst1q_s16_x4(ptr, c);
-
 // Load int16x8x2_t c <= ptr*
 #define vload16(c, ptr) c = vld1q_s16_x2(ptr);
 
 // Load int16x8x2_t c <= ptr*
 #define vstore16(ptr, c) vst1q_s16_x2(ptr, c);
 
-// Load int16x8_t c <= ptr*
-#define vload8(c, ptr) c = vld1q_s16(ptr);
-
-// Store *ptr <= c
-#define vstore8(ptr, c) vst1q_s16(ptr, c);
-
 // Load int16x4_t c <= ptr*
 #define vload4(c, ptr) c = vld1_s16(ptr);
 
-// Store *ptr <= c
-#define vstore4(ptr, c) vst1_s16(ptr, c);
-
 // Combine in16x8_t c: low | high
 #define vcombine(c, low, high) c = vcombine_s16(low, high);
-
-// c (int16x4) = a - b (int16x4)
-#define vsub4(c, a, b) c = vsub_s16(a, b);
 
 // c (int16x4) = a + b (int16x4)
 #define vadd4(c, a, b) c = vadd_s16(a, b);
@@ -70,17 +50,11 @@ void neon_polyvec_add_reduce(polyvec *c, const polyvec *a) {
 // c (int16x8) = a + b (int16x8)
 #define vadd8(c, a, b) c = vaddq_s16(a, b);
 
-// c (int16x8) = a - b (int16x8)
-#define vsub8(c, a, b) c = vsubq_s16(a, b);
-
 // get_low c (int16x4) = low(a) (int16x8)
 #define vlo(c, a) c = vget_low_s16(a);
 
 // get_high c (int16x4) = high(a) (int16x8)
 #define vhi(c, a) c = vget_high_s16(a);
-
-// c = const
-#define vdup(c, const) c = vdup_n_s16(const);
 
 // c = ~a
 #define vnot4(c, a) c = vmvn_s16(a);
@@ -178,7 +152,7 @@ out2: 1, 5, 9, d | 3, 7, b, f
 
 void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, const int to_mont) {
 
-  int16x8x4_t aa[KYBER_K], bb[KYBER_K]; // Min 4=2x2, Max 8=4x2
+  int16x8x2_t aa, bb, sum, cc;                                           //8
   int16x8_t ta1, ta2, ta3, ta4, 
             tb1, tb2, tb3, tb4;                                         // 4
   int16x4_t ta3_lo, ta3_hi, 
@@ -204,8 +178,8 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
   // End
 
   // Total possible register: Max 34 = 8+4+8+6+5+1+2, Min = 30
-  for (j = 0; j < KYBER_N; j += 16) {
-
+  // 1st Iteration
+  for (j = 0; j < KYBER_N; j+=16){
     // Load Zeta
     // 64, 65, 66, 67
     vload4(neon_zeta_positive, &zetas[k]);
@@ -215,131 +189,328 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
     vadd4(neon_zeta_negative, neon_zeta_negative, neon_one);
     k += 4;
 
-    // Load all K vector at the same time
-    for (i = 0; i < KYBER_K; i++) {
-      // Use max 8 registers
-      // 0, 2, 4, 6, 8, a, c, e
-      // 1, 3, 5, 7, 9, b, d, f
-      aa[i] = vld2q_s16(&a->vec[i].coeffs[j]);
-      bb[i] = vld2q_s16(&b->vec[i].coeffs[j]);
 
-      // Tranpose before multiply
-      transpose(ta1, ta2, aa[i].val[0], aa[i].val[1]);
-      transpose(tb1, tb2, bb[i].val[0], bb[i].val[1]);
+    // Use max 8 registers
+    // 0, 2, 4, 6, 8, a, c, e
+    // 1, 3, 5, 7, 9, b, d, f
+    aa = vld2q_s16(&a->vec[0].coeffs[j]);
+    bb = vld2q_s16(&b->vec[0].coeffs[j]);
 
-      permute(ta3, ta4, ta1, ta2);
-      permute(tb3, tb4, tb1, tb2);
 
-      // Do BaseMul
-      // Input: ta3, ta4, tb3, tb4
-      // t3: 0, 4, 8, 12, 2, 6, 10, 14
-      // t4: 1, 5, 9, 13, 3, 7, 11, 15
+    // Tranpose before multiply
+    transpose(ta1, ta2, aa.val[0], aa.val[1]);
+    transpose(tb1, tb2, bb.val[0], bb.val[1]);
 
-      // tc3_lo = ta3[0:4] x tb3[0:4] + ta4[0:4] x tb4[0:4] x zeta_positive
-      // tc3_hi = ta3[4:8] x tb3[4:8] + ta4[4:8] x tb4[4:8] x zeta_negative
+    permute(ta3, ta4, ta1, ta2);
+    permute(tb3, tb4, tb1, tb2);
 
-      // t4_lo = ta3[0:4] x tb4[0:4] + ta4[0:4] x tb3[0:4]
-      // t4_hi = ta3[4:8] x tb4[4:8] + ta4[4:8] x tb3[4:8]
+    // Do BaseMul
+    // Input: ta3, ta4, tb3, tb4
+    // t3: 0, 4, 8, 12, 2, 6, 10, 14
+    // t4: 1, 5, 9, 13, 3, 7, 11, 15
 
-      // Split fqmul
-      vlo(ta3_lo, ta3);
-      vhi(ta3_hi, ta3);
-      vlo(tb3_lo, tb3);
-      vhi(tb3_hi, tb3);
+    // tc3_lo = ta3[0:4] x tb3[0:4] + ta4[0:4] x tb4[0:4] x zeta_positive
+    // tc3_hi = ta3[4:8] x tb3[4:8] + ta4[4:8] x tb4[4:8] x zeta_negative
 
-      vlo(ta4_lo, ta4);
-      vhi(ta4_hi, ta4);
-      vlo(tb4_lo, tb4);
-      vhi(tb4_hi, tb4);
+    // t4_lo = ta3[0:4] x tb4[0:4] + ta4[0:4] x tb3[0:4]
+    // t4_hi = ta3[4:8] x tb4[4:8] + ta4[4:8] x tb3[4:8]
 
-      // ta3[0:4] x tb3[0:4]
-      // ta3[4:8] x tb3[4:8]
-      fqmul(ta3_lo, tb3_lo, t1, t2, t3, neon_qinv, neon_kyberq);
-      fqmul(ta3_hi, tb3_hi, t4, t5, t6, neon_qinv, neon_kyberq);
+    // Split fqmul
+    vlo(ta3_lo, ta3);
+    vhi(ta3_hi, ta3);
+    vlo(tb3_lo, tb3);
+    vhi(tb3_hi, tb3);
 
-      // ta4[0:4] x tb4[0:4] x zeta_positive
-      // ta4[4:8] x tb4[4:8] x zeta_negative
-      fqmul(ta4_lo, tb4_lo, t1, t2, t3, neon_qinv, neon_kyberq);
-      fqmul(ta4_hi, tb4_hi, t4, t5, t6, neon_qinv, neon_kyberq);
-      fqmul(ta4_lo, neon_zeta_positive, t1, t2, t3, neon_qinv, neon_kyberq);
-      fqmul(ta4_hi, neon_zeta_negative, t4, t5, t6, neon_qinv, neon_kyberq);
-      
-      vcombine(ta1, ta3_lo, ta3_hi);
-      vcombine(ta2, ta4_lo, ta4_hi);
+    vlo(ta4_lo, ta4);
+    vhi(ta4_hi, ta4);
+    vlo(tb4_lo, tb4);
+    vhi(tb4_hi, tb4);
 
-      // tb1 = ta1 + ta2
-      vadd8(aa[i].val[0], ta1, ta2);
+    // ta3[0:4] x tb3[0:4]
+    // ta3[4:8] x tb3[4:8]
+    fqmul(ta3_lo, tb3_lo, t1, t2, t3, neon_qinv, neon_kyberq);
+    fqmul(ta3_hi, tb3_hi, t4, t5, t6, neon_qinv, neon_kyberq);
 
-      // Split fqmul
-      vlo(ta3_lo, ta3);
-      vhi(ta3_hi, ta3);
-      vlo(tb3_lo, tb3);
-      vhi(tb3_hi, tb3);
+    // ta4[0:4] x tb4[0:4] x zeta_positive
+    // ta4[4:8] x tb4[4:8] x zeta_negative
+    fqmul(ta4_lo, tb4_lo, t1, t2, t3, neon_qinv, neon_kyberq);
+    fqmul(ta4_hi, tb4_hi, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(ta4_lo, neon_zeta_positive, t1, t2, t3, neon_qinv, neon_kyberq);
+    fqmul(ta4_hi, neon_zeta_negative, t4, t5, t6, neon_qinv, neon_kyberq);
+    
+    vcombine(ta1, ta3_lo, ta3_hi);
+    vcombine(ta2, ta4_lo, ta4_hi);
 
-      vlo(ta4_lo, ta4);
-      vhi(ta4_hi, ta4);
-      vlo(tb4_lo, tb4);
-      vhi(tb4_hi, tb4);
+    // tb1 = ta1 + ta2
+    vadd8(sum.val[0], ta1, ta2);
 
-      // ta3[0:4] x tb4[0:4]
-      // ta3[4:8] x tb4[4:8]
-      fqmul(ta3_lo, tb4_lo, t1, t2, t3, neon_qinv, neon_kyberq);
-      fqmul(ta3_hi, tb4_hi, t4, t5, t6, neon_qinv, neon_kyberq);
+    // Split fqmul
+    vlo(ta3_lo, ta3);
+    vhi(ta3_hi, ta3);
+    vlo(tb3_lo, tb3);
+    vhi(tb3_hi, tb3);
 
-      // ta4[0:4] x tb3[0:4]
-      // ta4[4:8] x tb3[4:8]
-      fqmul(ta4_lo, tb3_lo, t1, t2, t3, neon_qinv, neon_kyberq);
-      fqmul(ta4_hi, tb3_hi, t4, t5, t6, neon_qinv, neon_kyberq);
-      
-      vcombine(ta1, ta3_lo, ta3_hi);
-      vcombine(ta2, ta4_lo, ta4_hi);
-      
-      // tb2 = ta1 + ta2
-      vadd8(aa[i].val[1], ta1, ta2);
+    vlo(ta4_lo, ta4);
+    vhi(ta4_hi, ta4);
+    vlo(tb4_lo, tb4);
+    vhi(tb4_hi, tb4);
+
+    // ta3[0:4] x tb4[0:4]
+    // ta3[4:8] x tb4[4:8]
+    fqmul(ta3_lo, tb4_lo, t1, t2, t3, neon_qinv, neon_kyberq);
+    fqmul(ta3_hi, tb4_hi, t4, t5, t6, neon_qinv, neon_kyberq);
+
+    // ta4[0:4] x tb3[0:4]
+    // ta4[4:8] x tb3[4:8]
+    fqmul(ta4_lo, tb3_lo, t1, t2, t3, neon_qinv, neon_kyberq);
+    fqmul(ta4_hi, tb3_hi, t4, t5, t6, neon_qinv, neon_kyberq);
+    
+    vcombine(ta1, ta3_lo, ta3_hi);
+    vcombine(ta2, ta4_lo, ta4_hi);
+    
+    // tb2 = ta1 + ta2
+    vadd8(sum.val[1], ta1, ta2);
+
+    vstore16(&c->coeffs[j], sum);
+  }
+
+  
+  // 2nd, 3rd iteration
+  // Reassign K 
+  for (i = 1; i < KYBER_K - 1; i++)
+  {
+    k = 64;
+    for (j = 0; j < KYBER_N; j+=16){
+    // Load Zeta
+    // 64, 65, 66, 67
+    vload4(neon_zeta_positive, &zetas[k]);
+    // Convert zeta to negative sign
+    // -64, -64, -66, -67
+    vnot4(neon_zeta_negative, neon_zeta_positive);
+    vadd4(neon_zeta_negative, neon_zeta_negative, neon_one);
+    k += 4;
+
+    // Use max 8 registers
+    // 0, 2, 4, 6, 8, a, c, e
+    // 1, 3, 5, 7, 9, b, d, f
+    aa = vld2q_s16(&a->vec[i].coeffs[j]);
+    bb = vld2q_s16(&b->vec[i].coeffs[j]);
+    vload16(sum, &c->coeffs[j]);
+
+
+    // Tranpose before multiply
+    transpose(ta1, ta2, aa.val[0], aa.val[1]);
+    transpose(tb1, tb2, bb.val[0], bb.val[1]);
+
+    permute(ta3, ta4, ta1, ta2);
+    permute(tb3, tb4, tb1, tb2);
+
+    // Do BaseMul
+    // Input: ta3, ta4, tb3, tb4
+    // t3: 0, 4, 8, 12, 2, 6, 10, 14
+    // t4: 1, 5, 9, 13, 3, 7, 11, 15
+
+    // tc3_lo = ta3[0:4] x tb3[0:4] + ta4[0:4] x tb4[0:4] x zeta_positive
+    // tc3_hi = ta3[4:8] x tb3[4:8] + ta4[4:8] x tb4[4:8] x zeta_negative
+
+    // t4_lo = ta3[0:4] x tb4[0:4] + ta4[0:4] x tb3[0:4]
+    // t4_hi = ta3[4:8] x tb4[4:8] + ta4[4:8] x tb3[4:8]
+
+    // Split fqmul
+    vlo(ta3_lo, ta3);
+    vhi(ta3_hi, ta3);
+    vlo(tb3_lo, tb3);
+    vhi(tb3_hi, tb3);
+
+    vlo(ta4_lo, ta4);
+    vhi(ta4_hi, ta4);
+    vlo(tb4_lo, tb4);
+    vhi(tb4_hi, tb4);
+
+    // ta3[0:4] x tb3[0:4]
+    // ta3[4:8] x tb3[4:8]
+    fqmul(ta3_lo, tb3_lo, t1, t2, t3, neon_qinv, neon_kyberq);
+    fqmul(ta3_hi, tb3_hi, t4, t5, t6, neon_qinv, neon_kyberq);
+
+    // ta4[0:4] x tb4[0:4] x zeta_positive
+    // ta4[4:8] x tb4[4:8] x zeta_negative
+    fqmul(ta4_lo, tb4_lo, t1, t2, t3, neon_qinv, neon_kyberq);
+    fqmul(ta4_hi, tb4_hi, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(ta4_lo, neon_zeta_positive, t1, t2, t3, neon_qinv, neon_kyberq);
+    fqmul(ta4_hi, neon_zeta_negative, t4, t5, t6, neon_qinv, neon_kyberq);
+    
+    vcombine(ta1, ta3_lo, ta3_hi);
+    vcombine(ta2, ta4_lo, ta4_hi);
+
+    // tb1 = ta1 + ta2
+    vadd8(cc.val[0], ta1, ta2);
+    vadd8(sum.val[0], sum.val[0], cc.val[0]);
+
+    // Split fqmul
+    vlo(ta3_lo, ta3);
+    vhi(ta3_hi, ta3);
+    vlo(tb3_lo, tb3);
+    vhi(tb3_hi, tb3);
+
+    vlo(ta4_lo, ta4);
+    vhi(ta4_hi, ta4);
+    vlo(tb4_lo, tb4);
+    vhi(tb4_hi, tb4);
+
+    // ta3[0:4] x tb4[0:4]
+    // ta3[4:8] x tb4[4:8]
+    fqmul(ta3_lo, tb4_lo, t1, t2, t3, neon_qinv, neon_kyberq);
+    fqmul(ta3_hi, tb4_hi, t4, t5, t6, neon_qinv, neon_kyberq);
+
+    // ta4[0:4] x tb3[0:4]
+    // ta4[4:8] x tb3[4:8]
+    fqmul(ta4_lo, tb3_lo, t1, t2, t3, neon_qinv, neon_kyberq);
+    fqmul(ta4_hi, tb3_hi, t4, t5, t6, neon_qinv, neon_kyberq);
+    
+    vcombine(ta1, ta3_lo, ta3_hi);
+    vcombine(ta2, ta4_lo, ta4_hi);
+    
+    // tb2 = ta1 + ta2
+    vadd8(cc.val[1], ta1, ta2);
+    vadd8(sum.val[1], sum.val[1], cc.val[1]);
+
+    vstore16(&c->coeffs[j], sum);
     }
+  }
+  
 
-    // Sum polyvec to poly:     poly_add(r, r, &t);
-    for (i = 1; i < KYBER_K; i++) {
-      vadd8(aa[0].val[0], aa[0].val[0], aa[i].val[0]);
-      vadd8(aa[0].val[1], aa[0].val[1], aa[i].val[1]);
-    }
+  // Last Iteration
+  // Reassign k
+  k = 64;
+  for (j = 0; j < KYBER_N; j+=16){
+    // Load Zeta
+    // 64, 65, 66, 67
+    vload4(neon_zeta_positive, &zetas[k]);
+    // Convert zeta to negative sign
+    // -64, -64, -66, -67
+    vnot4(neon_zeta_negative, neon_zeta_positive);
+    vadd4(neon_zeta_negative, neon_zeta_negative, neon_one);
+    k += 4;
+
+
+    // Use max 8 registers
+    // 0, 2, 4, 6, 8, a, c, e
+    // 1, 3, 5, 7, 9, b, d, f
+    aa = vld2q_s16(&a->vec[KYBER_K-1].coeffs[j]);
+    bb = vld2q_s16(&b->vec[KYBER_K-1].coeffs[j]);
+    vload16(sum, &c->coeffs[j]);
+
+
+    // Tranpose before multiply
+    transpose(ta1, ta2, aa.val[0], aa.val[1]);
+    transpose(tb1, tb2, bb.val[0], bb.val[1]);
+
+    permute(ta3, ta4, ta1, ta2);
+    permute(tb3, tb4, tb1, tb2);
+
+    // Do BaseMul
+    // Input: ta3, ta4, tb3, tb4
+    // t3: 0, 4, 8, 12, 2, 6, 10, 14
+    // t4: 1, 5, 9, 13, 3, 7, 11, 15
+
+    // tc3_lo = ta3[0:4] x tb3[0:4] + ta4[0:4] x tb4[0:4] x zeta_positive
+    // tc3_hi = ta3[4:8] x tb3[4:8] + ta4[4:8] x tb4[4:8] x zeta_negative
+
+    // t4_lo = ta3[0:4] x tb4[0:4] + ta4[0:4] x tb3[0:4]
+    // t4_hi = ta3[4:8] x tb4[4:8] + ta4[4:8] x tb3[4:8]
+
+    // Split fqmul
+    vlo(ta3_lo, ta3);
+    vhi(ta3_hi, ta3);
+    vlo(tb3_lo, tb3);
+    vhi(tb3_hi, tb3);
+
+    vlo(ta4_lo, ta4);
+    vhi(ta4_hi, ta4);
+    vlo(tb4_lo, tb4);
+    vhi(tb4_hi, tb4);
+
+    // ta3[0:4] x tb3[0:4]
+    // ta3[4:8] x tb3[4:8]
+    fqmul(ta3_lo, tb3_lo, t1, t2, t3, neon_qinv, neon_kyberq);
+    fqmul(ta3_hi, tb3_hi, t4, t5, t6, neon_qinv, neon_kyberq);
+
+    // ta4[0:4] x tb4[0:4] x zeta_positive
+    // ta4[4:8] x tb4[4:8] x zeta_negative
+    fqmul(ta4_lo, tb4_lo, t1, t2, t3, neon_qinv, neon_kyberq);
+    fqmul(ta4_hi, tb4_hi, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(ta4_lo, neon_zeta_positive, t1, t2, t3, neon_qinv, neon_kyberq);
+    fqmul(ta4_hi, neon_zeta_negative, t4, t5, t6, neon_qinv, neon_kyberq);
+    
+    vcombine(ta1, ta3_lo, ta3_hi);
+    vcombine(ta2, ta4_lo, ta4_hi);
+
+    // tb1 = ta1 + ta2
+    vadd8(cc.val[0], ta1, ta2);
+    vadd8(sum.val[0], sum.val[0], cc.val[0]);
+
+    // Split fqmul
+    vlo(ta3_lo, ta3);
+    vhi(ta3_hi, ta3);
+    vlo(tb3_lo, tb3);
+    vhi(tb3_hi, tb3);
+
+    vlo(ta4_lo, ta4);
+    vhi(ta4_hi, ta4);
+    vlo(tb4_lo, tb4);
+    vhi(tb4_hi, tb4);
+
+    // ta3[0:4] x tb4[0:4]
+    // ta3[4:8] x tb4[4:8]
+    fqmul(ta3_lo, tb4_lo, t1, t2, t3, neon_qinv, neon_kyberq);
+    fqmul(ta3_hi, tb4_hi, t4, t5, t6, neon_qinv, neon_kyberq);
+
+    // ta4[0:4] x tb3[0:4]
+    // ta4[4:8] x tb3[4:8]
+    fqmul(ta4_lo, tb3_lo, t1, t2, t3, neon_qinv, neon_kyberq);
+    fqmul(ta4_hi, tb3_hi, t4, t5, t6, neon_qinv, neon_kyberq);
+    
+    vcombine(ta1, ta3_lo, ta3_hi);
+    vcombine(ta2, ta4_lo, ta4_hi);
+    
+    // tb2 = ta1 + ta2
+    vadd8(cc.val[1], ta1, ta2);
+    vadd8(sum.val[1], sum.val[1], cc.val[1]);
 
     // Do poly_reduce:   poly_reduce(r);
-    barrett(aa[0].val[0], bb[0].val[0], ta3_lo, ta3_hi, t1, t2, neon_v, neon_kyberq16);
-    barrett(aa[0].val[1], bb[0].val[1], tb3_lo, tb3_hi, t3, t4, neon_v, neon_kyberq16);
+    barrett(sum.val[0], cc.val[0], ta3_lo, ta3_hi, t1, t2, neon_v, neon_kyberq16);
+    barrett(sum.val[1], cc.val[1], tb3_lo, tb3_hi, t3, t4, neon_v, neon_kyberq16);
 
     if (to_mont)
     {
       neon_zeta = vdup_n_s16(((1ULL << 32) % KYBER_Q));
 
       // Split fqmul
-      vlo(ta3_lo, aa[0].val[0]);
-      vhi(ta3_hi, aa[0].val[0]);
-      vlo(ta4_lo, aa[0].val[1]);
-      vhi(ta4_hi, aa[0].val[1]);
+      vlo(ta3_lo, sum.val[0]);
+      vhi(ta3_hi, sum.val[0]);
+      vlo(ta4_lo, sum.val[1]);
+      vhi(ta4_hi, sum.val[1]);
 
       fqmul(ta3_lo, neon_zeta, t1, t2, t3, neon_qinv, neon_kyberq);
       fqmul(ta3_hi, neon_zeta, t4, t5, t6, neon_qinv, neon_kyberq);
       fqmul(ta4_lo, neon_zeta, t1, t2, t3, neon_qinv, neon_kyberq);
       fqmul(ta4_hi, neon_zeta, t4, t5, t6, neon_qinv, neon_kyberq);
       
-      vcombine(aa[0].val[0], ta3_lo, ta3_hi);
-      vcombine(aa[0].val[1], ta4_lo, ta4_hi);
+      vcombine(sum.val[0], ta3_lo, ta3_hi);
+      vcombine(sum.val[1], ta4_lo, ta4_hi);
     }
 
     // Tranpose before store back to memory
     // tb1: 0, 4, 8, 12, 2, 6, 10, 14
     // tb2: 1, 5, 9, 13, 3, 7, 11, 15
-    depermute(tb1, tb2, aa[0].val[0], aa[0].val[1]);
+    depermute(tb1, tb2, sum.val[0], sum.val[1]);
 
     // tb3: 0, 1, 4, 5, 8, 9, 12, 13
     // tb4: 2, 3, 6, 7, 10, 11, 14, 15
-    transpose(aa[0].val[0], aa[0].val[1], tb1, tb2);
+    transpose(sum.val[0], sum.val[1], tb1, tb2);
 
     // 0, 2, 4, 6, 8, a, c, e
     // 1, 3, 5, 7, 9, b, d, f
-
-    // Store poly to memory
-    vstore16(&c->coeffs[j], aa[0]);
+    vst2q_s16(&c->coeffs[j], sum);
   }
 }
