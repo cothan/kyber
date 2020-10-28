@@ -10,7 +10,7 @@ void neon_polyvec_ntt(polyvec *r)
   for(i=0;i<KYBER_K;i++)
   {
     neon_ntt(r->vec[i].coeffs);
-    neon_poly_reduce(&r->vec[i]);
+    // neon_poly_reduce(&r->vec[i]);
   }
 }
 
@@ -122,7 +122,7 @@ t_lo: int16x4_t
 t_hi: int16x4_t
 t1: int32x4_t
 t2: int32x4_t
-neon_v: int16x8_t
+neon_v: int16x4_t
 neon_kyberq16: int16x8_t
 
 rewrite pseudo code:
@@ -178,16 +178,17 @@ out2: 1, 5, 9, d | 3, 7, b, f
 
 void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, const int to_mont) {
 
-  int16x8x2_t aa[KYBER_K], bb[KYBER_K]; // Min 4=2x2, Max 8=4x2
-  int16x8_t ta1, ta2, ta3, ta4, tb1, tb2, tb3, tb4, tc1, tc2, tc3, tc4; // 12
-  int16x8_t neon_kyberq16;                                              // 1
-  int16x4_t tb3_lo, tb3_hi, 
-            tb4_lo, tb4_hi, 
-            ta3_lo, ta3_hi, 
-            ta4_lo, ta4_hi;                                             // 8
+  int16x8x4_t aa[KYBER_K], bb[KYBER_K]; // Min 4=2x2, Max 8=4x2
+  int16x8_t ta1, ta2, ta3, ta4, 
+            tb1, tb2, tb3, tb4;                                         // 4
+  int16x4_t ta3_lo, ta3_hi, 
+            tb3_lo, tb3_hi, 
+            ta4_lo, ta4_hi,                                             // 8
+            tb4_lo, tb4_hi; 
+  int32x4_t t1, t2, t3, t4, t5, t6;                                     // 6
   int16x4_t neon_zeta, neon_one, neon_v, 
-            neon_zeta_positive, neon_zeta_negative;                     // 3
-  int32x4_t t1, t2, t3, t4;                                             // 4
+            neon_zeta_positive, neon_zeta_negative;                     // 5
+  int16x8_t neon_kyberq16;                                              // 1
   int32x4_t neon_qinv, neon_kyberq;                                     // 2
 
   // Declare constant
@@ -198,12 +199,12 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
   neon_one = vdup_n_s16(1);
 
   // Scalar variable
-  unsigned int k = 64, i, j;
+  unsigned int k = 64;
+  unsigned int i, j;
   // End
 
-  // Total possible register: 30 = 8 + 12 + 4 + 4 + 4 + 2
+  // Total possible register: Max 34 = 8+4+8+6+5+1+2, Min = 30
   for (j = 0; j < KYBER_N; j += 16) {
-    // Load all K vector at the same time
 
     // Load Zeta
     // 64, 65, 66, 67
@@ -214,8 +215,11 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
     vadd4(neon_zeta_negative, neon_zeta_negative, neon_one);
     k += 4;
 
+    // Load all K vector at the same time
     for (i = 0; i < KYBER_K; i++) {
-      // Use 8 registers
+      // Use max 8 registers
+      // 0, 2, 4, 6, 8, a, c, e
+      // 1, 3, 5, 7, 9, b, d, f
       aa[i] = vld2q_s16(&a->vec[i].coeffs[j]);
       bb[i] = vld2q_s16(&b->vec[i].coeffs[j]);
 
@@ -251,19 +255,20 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
       // ta3[0:4] x tb3[0:4]
       // ta3[4:8] x tb3[4:8]
       fqmul(ta3_lo, tb3_lo, t1, t2, t3, neon_qinv, neon_kyberq);
-      fqmul(ta3_hi, tb3_hi, t1, t2, t3, neon_qinv, neon_kyberq);
-      vcombine(tc3, ta3_lo, ta3_hi);
+      fqmul(ta3_hi, tb3_hi, t4, t5, t6, neon_qinv, neon_kyberq);
 
       // ta4[0:4] x tb4[0:4] x zeta_positive
       // ta4[4:8] x tb4[4:8] x zeta_negative
       fqmul(ta4_lo, tb4_lo, t1, t2, t3, neon_qinv, neon_kyberq);
-      fqmul(ta4_hi, tb4_hi, t1, t2, t3, neon_qinv, neon_kyberq);
+      fqmul(ta4_hi, tb4_hi, t4, t5, t6, neon_qinv, neon_kyberq);
       fqmul(ta4_lo, neon_zeta_positive, t1, t2, t3, neon_qinv, neon_kyberq);
-      fqmul(ta4_hi, neon_zeta_negative, t1, t2, t3, neon_qinv, neon_kyberq);
-      vcombine(tc4, ta4_lo, tb4_hi);
+      fqmul(ta4_hi, neon_zeta_negative, t4, t5, t6, neon_qinv, neon_kyberq);
+      
+      vcombine(ta1, ta3_lo, ta3_hi);
+      vcombine(ta2, ta4_lo, ta4_hi);
 
-      // tc1 = tc3 + tc4
-      vadd8(tc1, tc3, tc4);
+      // tb1 = ta1 + ta2
+      vadd8(aa[i].val[0], ta1, ta2);
 
       // Split fqmul
       vlo(ta3_lo, ta3);
@@ -279,20 +284,18 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
       // ta3[0:4] x tb4[0:4]
       // ta3[4:8] x tb4[4:8]
       fqmul(ta3_lo, tb4_lo, t1, t2, t3, neon_qinv, neon_kyberq);
-      fqmul(ta3_hi, tb4_hi, t1, t2, t3, neon_qinv, neon_kyberq);
-      vcombine(tc3, ta3_lo, ta3_hi);
+      fqmul(ta3_hi, tb4_hi, t4, t5, t6, neon_qinv, neon_kyberq);
 
       // ta4[0:4] x tb3[0:4]
       // ta4[4:8] x tb3[4:8]
       fqmul(ta4_lo, tb3_lo, t1, t2, t3, neon_qinv, neon_kyberq);
-      fqmul(ta4_hi, tb3_hi, t1, t2, t3, neon_qinv, neon_kyberq);
-      vcombine(tc4, ta4_lo, ta4_hi);
-
-      vadd8(tc2, tc3, tc4);
-
-      // Tranpose before store back to memory
-      depermute(tc3, tc4, tc1, tc2);
-      transpose(aa[i].val[0], aa[i].val[1], tc3, tc4);
+      fqmul(ta4_hi, tb3_hi, t4, t5, t6, neon_qinv, neon_kyberq);
+      
+      vcombine(ta1, ta3_lo, ta3_hi);
+      vcombine(ta2, ta4_lo, ta4_hi);
+      
+      // tb2 = ta1 + ta2
+      vadd8(aa[i].val[1], ta1, ta2);
     }
 
     // Sum polyvec to poly:     poly_add(r, r, &t);
@@ -312,18 +315,29 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
       // Split fqmul
       vlo(ta3_lo, aa[0].val[0]);
       vhi(ta3_hi, aa[0].val[0]);
-      vlo(tb3_lo, aa[0].val[1]);
-      vhi(tb3_hi, aa[0].val[1]);
+      vlo(ta4_lo, aa[0].val[1]);
+      vhi(ta4_hi, aa[0].val[1]);
 
       fqmul(ta3_lo, neon_zeta, t1, t2, t3, neon_qinv, neon_kyberq);
-      fqmul(ta3_hi, neon_zeta, t1, t2, t3, neon_qinv, neon_kyberq);
-      fqmul(tb3_lo, neon_zeta, t1, t2, t3, neon_qinv, neon_kyberq);
-      fqmul(tb3_hi, neon_zeta, t1, t2, t3, neon_qinv, neon_kyberq);
+      fqmul(ta3_hi, neon_zeta, t4, t5, t6, neon_qinv, neon_kyberq);
+      fqmul(ta4_lo, neon_zeta, t1, t2, t3, neon_qinv, neon_kyberq);
+      fqmul(ta4_hi, neon_zeta, t4, t5, t6, neon_qinv, neon_kyberq);
       
-
       vcombine(aa[0].val[0], ta3_lo, ta3_hi);
-      vcombine(aa[0].val[1], tb3_lo, tb3_hi);
+      vcombine(aa[0].val[1], ta4_lo, ta4_hi);
     }
+
+    // Tranpose before store back to memory
+    // tb1: 0, 4, 8, 12, 2, 6, 10, 14
+    // tb2: 1, 5, 9, 13, 3, 7, 11, 15
+    depermute(tb1, tb2, aa[0].val[0], aa[0].val[1]);
+
+    // tb3: 0, 1, 4, 5, 8, 9, 12, 13
+    // tb4: 2, 3, 6, 7, 10, 11, 14, 15
+    transpose(aa[0].val[0], aa[0].val[1], tb1, tb2);
+
+    // 0, 2, 4, 6, 8, a, c, e
+    // 1, 3, 5, 7, 9, b, d, f
 
     // Store poly to memory
     vstore16(&c->coeffs[j], aa[0]);
