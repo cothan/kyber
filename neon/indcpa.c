@@ -240,9 +240,7 @@ void indcpa_keypair(uint8_t pk[KYBER_INDCPA_PUBLICKEYBYTES],
 
   // matrix-vector multiplication
   for(i=0;i<KYBER_K;i++) {
-    polyvec_pointwise_acc_montgomery(&pkpv.vec[i], &a[i], &skpv);
-    poly_tomont(&pkpv.vec[i]);
-    // neon_polyvec_acc_montgomery(&pkpv.vec[i], &a[i], &skpv, 1);
+    neon_polyvec_acc_montgomery(&pkpv.vec[i], &a[i], &skpv, 1);
   }
 
   neon_polyvec_add_reduce(&pkpv, &e);
@@ -293,11 +291,9 @@ void indcpa_enc(uint8_t c[KYBER_INDCPA_BYTES],
 
   // matrix-vector multiplication
   for(i=0;i<KYBER_K;i++)
-    polyvec_pointwise_acc_montgomery(&bp.vec[i], &at[i], &sp);
-    // neon_polyvec_acc_montgomery(&bp.vec[i], &at[i], &sp, 0);
+    neon_polyvec_acc_montgomery(&bp.vec[i], &at[i], &sp, 0);
 
-  polyvec_pointwise_acc_montgomery(&v, &pkpv, &sp);
-  // neon_polyvec_acc_montgomery(&v, &pkpv, &sp, 0);
+  neon_polyvec_acc_montgomery(&v, &pkpv, &sp, 0);
 
   neon_polyvec_invntt_to_mont(&bp);
   neon_invntt(v.coeffs);
@@ -333,8 +329,7 @@ void indcpa_dec(uint8_t m[KYBER_INDCPA_MSGBYTES],
   unpack_sk(&skpv, sk);
 
   neon_polyvec_ntt(&bp);
-  polyvec_pointwise_acc_montgomery(&mp, &skpv, &bp);
-  // neon_polyvec_acc_montgomery(&mp, &skpv, &bp, 0);
+  neon_polyvec_acc_montgomery(&mp, &skpv, &bp, 0);
   neon_invntt(mp.coeffs);
 
   neon_poly_sub_reduce(&v, &mp);
