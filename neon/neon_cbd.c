@@ -320,16 +320,7 @@ void neon_cbd3(poly *r, const uint8_t buf[3 * KYBER_N / 4])
     }
 }
 
-void neon_cbd_eta2(poly *r, const uint8_t buf[KYBER_ETA1 * KYBER_N / 4])
-{
-#if KYBER_ETA2 != 2
-#error "This implementation requires eta2 = 2"
-#else
-    neon_cbd2(r, buf);
-#endif
-}
-
-void neon_cbd_eta1(poly *r, const uint8_t buf[KYBER_ETA1*KYBER_N/4])
+void neon_cbd_eta1(poly *r, const uint8_t buf[KYBER_ETA1 * KYBER_N/4])
 {
 #if KYBER_ETA1 == 2
   neon_cbd2(r, buf);
@@ -337,6 +328,15 @@ void neon_cbd_eta1(poly *r, const uint8_t buf[KYBER_ETA1*KYBER_N/4])
   neon_cbd3(r, buf);
 #else
 #error "This implementation requires eta1 in {2,3}"
+#endif
+}
+
+void neon_cbd_eta2(poly *r, const uint8_t buf[KYBER_ETA1 * KYBER_N / 4])
+{
+#if KYBER_ETA2 != 2
+#error "This implementation requires eta2 = 2"
+#else
+    neon_cbd2(r, buf);
 #endif
 }
 
