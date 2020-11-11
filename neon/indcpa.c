@@ -281,11 +281,38 @@ void indcpa_enc(uint8_t c[KYBER_INDCPA_BYTES],
   poly_frommsg(&k, m);
   gen_at(at, seed);
 
-  for(i=0;i<KYBER_K;i++)
-    poly_getnoise_eta1(sp.vec+i, coins, nonce++);
-  for(i=0;i<KYBER_K;i++)
-    poly_getnoise_eta2(ep.vec+i, coins, nonce++);
-  poly_getnoise_eta2(&epp, coins, nonce++);
+#if KYBER_K == 2
+  // ETA1 != ETA2 (3 != 2)
+  neon_poly_getnoise_eta1_2x(sp.vec + 0, sp.vec + 1, coins, 0, 1);
+  neon_poly_getnoise_eta2_2x(ep.vec + 0, ep.vec + 1, coins, 2, 3);
+  neon_poly_getnoise_eta2(&epp, coins, 4);
+#elif KYBER_K == 3
+#if KYBER_ETA1 == KYBER_ETA2
+  // Because ETA1 == ETA2 
+  neon_poly_getnoise_eta1_2x(sp.vec + 0, sp.vec + 1, coins, 0, 1);
+  neon_poly_getnoise_eta1_2x(sp.vec + 2, ep.vec + 0, coins, 2, 3);
+  neon_poly_getnoise_eta1_2x(ep.vec + 1, ep.vec + 2, coins, 4, 5);
+  neon_poly_getnoise_eta2(&epp, coins, 6);
+#else
+#error "We need eta1 == eta2 here"
+#endif
+#elif KYBER_K == 4
+#if KYBER_ETA1 == KYBER_ETA2
+  neon_poly_getnoise_eta1_2x(sp.vec + 0, sp.vec + 1, coins, 0, 1);
+  neon_poly_getnoise_eta1_2x(sp.vec + 2, sp.vec + 3, coins, 2, 3);
+  neon_poly_getnoise_eta1_2x(ep.vec + 0, ep.vec + 1, coins, 4, 5);
+  neon_poly_getnoise_eta1_2x(ep.vec + 2, ep.vec + 3, coins, 6, 7);
+  neon_poly_getnoise_eta2(&epp, coins, 8);
+#else
+#error "We need eta1 == eta2 here"
+#endif
+#endif
+
+  // for(i=0;i<KYBER_K;i++)
+  //   poly_getnoise_eta1(sp.vec+i, coins, nonce++);
+  // for(i=0;i<KYBER_K;i++)
+  //   poly_getnoise_eta2(ep.vec+i, coins, nonce++);
+  // poly_getnoise_eta2(&epp, coins, nonce++);
 
   neon_polyvec_ntt(&sp);
 
