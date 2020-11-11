@@ -27,8 +27,11 @@ void poly_frommsg(poly *r, const uint8_t msg[KYBER_INDCPA_MSGBYTES]);
 #define poly_tomsg KYBER_NAMESPACE(_poly_tomsg)
 void poly_tomsg(uint8_t msg[KYBER_INDCPA_MSGBYTES], poly *r);
 
-#define poly_getnoise KYBER_NAMESPACE(_poly_getnoise)
-void poly_getnoise(poly *r, const uint8_t seed[KYBER_SYMBYTES], uint8_t nonce);
+#define poly_getnoise_eta1 KYBER_NAMESPACE(_poly_getnoise_eta1)
+void poly_getnoise_eta1(poly *r, const uint8_t seed[KYBER_SYMBYTES], uint8_t nonce);
+
+#define poly_getnoise_eta2 KYBER_NAMESPACE(_poly_getnoise_eta2)
+void poly_getnoise_eta2(poly *r, const uint8_t seed[KYBER_SYMBYTES], uint8_t nonce);
 
 #define poly_ntt KYBER_NAMESPACE(_poly_ntt)
 void poly_ntt(poly *r);
@@ -49,6 +52,8 @@ void poly_add(poly *r, const poly *a, const poly *b);
 #define poly_sub KYBER_NAMESPACE(_poly_sub)
 void poly_sub(poly *r, const poly *a, const poly *b);
 
+// NEON
+
 #define neon_poly_reduce KYBER_NAMESPACE(_neon_poly_reduce)
 void neon_poly_reduce(poly *c);
 #define neon_poly_add_reduce KYBER_NAMESPACE(_neon_poly_add_reduce)
@@ -58,4 +63,16 @@ void neon_poly_sub_reduce(poly *c, const poly *a);
 #define neon_poly_add_add_reduce KYBER_NAMESPACE(_neon_poly_add_add_reduce)
 void neon_poly_add_add_reduce(poly *c, const poly *a, const poly *b);
 
+void neon_poly_getnoise_eta1_2x(poly *vec1, poly *vec2,
+                                const uint8_t seed[KYBER_SYMBYTES],
+                                uint8_t nonce1, uint8_t nonce2);
+
+
+void neon_poly_getnoise_eta2_2x(poly *vec1, poly *vec2,
+                                const uint8_t seed[KYBER_SYMBYTES],
+                                uint8_t nonce1, uint8_t nonce2);
+
+void neon_poly_getnoise_eta2(poly *r,
+                             const uint8_t seed[KYBER_SYMBYTES],
+                             uint8_t nonce);
 #endif
