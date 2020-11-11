@@ -1,6 +1,8 @@
 #include <arm_neon.h>
 #include "params.h"
 #include "poly.h"
+#include "symmetric.h"
+#include "cbd.h"
 
 
 // Load int16x8x4_t c <= ptr*
@@ -202,4 +204,35 @@ void neon_poly_add_add_reduce(poly *c, const poly *a, const poly *b) {
     // c = t;
     vstore(&c->coeffs[i], cc);
   }
+}
+
+void neon_poly_getnoise_eta1_2x(poly *vec1, poly *vec2,
+                                const uint8_t seed[KYBER_SYMBYTES],
+                                uint8_t nonce1, uint8_t nonce2)
+{
+    uint8_t buf1[KYBER_ETA1 * KYBER_N / 4],
+            buf2[KYBER_ETA1 * KYBER_N / 4];
+    neon_prf(buf1, buf2, sizeof(buf1), seed, nonce1, nonce2);
+    neon_cbd_eta1(vec1, buf1);
+    neon_cbd_eta1(vec2, buf2);
+}
+
+void neon_poly_getnoise_eta2_2x(poly *vec1, poly *vec2,
+                                const uint8_t seed[KYBER_SYMBYTES],
+                                uint8_t nonce1, uint8_t nonce2)
+{
+    uint8_t buf1[KYBER_ETA2 * KYBER_N / 4],
+            buf2[KYBER_ETA2 * KYBER_N / 4];
+    neon_prf(buf1, buf2, sizeof(buf1), seed, nonce1, nonce2);
+    neon_cbd_eta2(vec1, buf1);
+    neon_cbd_eta2(vec2, buf2);
+}
+
+void neon_poly_getnoise_eta2(poly *r,
+                             const uint8_t seed[KYBER_SYMBYTES],
+                             uint8_t nonce)
+{
+    uint8_t buf[KYBER_ETA2 * KYBER_N / 4];
+    prf(buf, sizeof(buf), seed, nonce);
+    neon_cbd_eta2(r, buf);
 }
