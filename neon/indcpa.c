@@ -230,10 +230,29 @@ void indcpa_keypair(uint8_t pk[KYBER_INDCPA_PUBLICKEYBYTES],
 
   gen_a(a, publicseed);
 
-  for(i=0;i<KYBER_K;i++)
-    poly_getnoise_eta1(&skpv.vec[i], noiseseed, nonce++);
-  for(i=0;i<KYBER_K;i++)
-    poly_getnoise_eta1(&e.vec[i], noiseseed, nonce++);
+#if KYBER_K == 2
+  // ETA1 != ETA2 (3 != 2)
+  neon_poly_getnoise_eta1_2x(skpv.vec + 0, skpv.vec + 1, noiseseed, 0, 1);
+  neon_poly_getnoise_eta1_2x(e.vec + 0, e.vec + 1, noiseseed, 2, 3);
+#elif KYBER_K == 3
+#if KYBER_ETA1 == KYBER_ETA2
+  // Because ETA1 == ETA2 
+  neon_poly_getnoise_eta1_2x(skpv.vec + 0, skpv.vec + 1, noiseseed, 0, 1);
+  neon_poly_getnoise_eta1_2x(skpv.vec + 2, e.vec + 0, noiseseed, 2, 3);
+  neon_poly_getnoise_eta1_2x(e.vec + 1, e.vec + 2, noiseseed, 4, 5);
+#else
+#error "We need eta1 == eta2 here"
+#endif
+#elif KYBER_K == 4
+#if KYBER_ETA1 == KYBER_ETA2
+  neon_poly_getnoise_eta1_2x(skpv.vec + 0, skpv.vec + 1, noiseseed, 0, 1);
+  neon_poly_getnoise_eta1_2x(skpv.vec + 2, skpv.vec + 3, noiseseed, 2, 3);
+  neon_poly_getnoise_eta1_2x(e.vec + 0, e.vec + 1, noiseseed, 4, 5);
+  neon_poly_getnoise_eta1_2x(e.vec + 2, e.vec + 3, noiseseed, 6, 7);
+#else
+#error "We need eta1 == eta2 here"
+#endif
+#endif
 
   neon_polyvec_ntt(&skpv);
   neon_polyvec_ntt(&e);
@@ -307,12 +326,6 @@ void indcpa_enc(uint8_t c[KYBER_INDCPA_BYTES],
 #error "We need eta1 == eta2 here"
 #endif
 #endif
-
-  // for(i=0;i<KYBER_K;i++)
-  //   poly_getnoise_eta1(sp.vec+i, coins, nonce++);
-  // for(i=0;i<KYBER_K;i++)
-  //   poly_getnoise_eta2(ep.vec+i, coins, nonce++);
-  // poly_getnoise_eta2(&epp, coins, nonce++);
 
   neon_polyvec_ntt(&sp);
 
