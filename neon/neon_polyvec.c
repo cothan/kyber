@@ -136,6 +136,7 @@ out2 : int16x8_t
 --> permutation inside 01 register
 out1: 0, 4, 8, c | 2, 6, a, e
 out2: 1, 5, 9, d | 3, 7, b, f
+TODO: Unroll the whole operation to save load/store, use #ifdef 
 */
 #define transpose(out1, out2, in1, in2)                                        \
   out1 = vtrn1q_s16(in1, in2);                                                 \
