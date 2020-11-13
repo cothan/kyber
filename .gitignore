@@ -7,4 +7,7 @@ tvecs768-90s
 *.req
 *.rsp
 *.out.*
+*.json
 neon/params.h
+neon/neon_cbd
+neon/neon_sample
