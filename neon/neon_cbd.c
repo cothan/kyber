@@ -4,7 +4,7 @@
 #include "cbd.h"
 
 #define vload(c, ptr) c = vld1q_u32(ptr);
-#define vload3(c, ptr) c = vld3q_u8(ptr);
+#define vload3(c, ptr) c = vld1q_u8_x3(ptr);
 #define vstore(ptr, c) vst1q_s16_x4(ptr, c);
 
 // c = a & b
@@ -93,25 +93,25 @@ Use 18 SIMD registers
     x.val[2] = (int16x8_t)y17;                                                     \
     x.val[3] = (int16x8_t)y21;
 
-#define transpose4x8(x, y)                                         \
-    y16 = vtrn1q_u16((uint16x8_t)y[0], (uint16x8_t)y[1]);          \
-    y18 = vtrn1q_u16((uint16x8_t)y[2], (uint16x8_t)y[3]);          \
-    y24 = (int16x8_t)vtrn1q_u32((uint32x4_t)y16, (uint32x4_t)y18); \
-    y25 = (int16x8_t)vtrn2q_u32((uint32x4_t)y16, (uint32x4_t)y18); \
-                                                                   \
-    y10 = (int16x8_t)vtrn1q_u64((uint64x2_t)y24, (uint64x2_t)y25); \
-    y11 = (int16x8_t)vtrn2q_u64((uint64x2_t)y24, (uint64x2_t)y25); \
-    y16 = vtrn1q_u16((uint16x8_t)y[4], (uint16x8_t)y[5]);          \
-    y18 = vtrn1q_u16((uint16x8_t)y[6], (uint16x8_t)y[7]);          \
-    y24 = (int16x8_t)vtrn1q_u32((uint32x4_t)y16, (uint32x4_t)y18); \
-    y25 = (int16x8_t)vtrn2q_u32((uint32x4_t)y16, (uint32x4_t)y18); \
-                                                                   \
-    y12 = (int16x8_t)vtrn1q_u64((uint64x2_t)y24, (uint64x2_t)y25); \
-    y13 = (int16x8_t)vtrn2q_u64((uint64x2_t)y24, (uint64x2_t)y25); \
-    x.val[0] = y10;                                                \
-    x.val[1] = y11;                                                \
-    x.val[2] = y12;                                                \
-    x.val[3] = y13;
+#define transpose4x8(x, y, i)                                       \
+    y16 = vtrn1q_u16((uint16x8_t)y[i + 0], (uint16x8_t)y[i + 1]);   \
+    y18 = vtrn1q_u16((uint16x8_t)y[i + 2], (uint16x8_t)y[i + 3]);   \
+    y24 = (uint16x8_t)vtrn1q_u32((uint32x4_t)y16, (uint32x4_t)y18); \
+    y25 = (uint16x8_t)vtrn2q_u32((uint32x4_t)y16, (uint32x4_t)y18); \
+    y10 = (uint16x8_t)vtrn1q_u64((uint64x2_t)y24, (uint64x2_t)y25); \
+    y11 = (uint16x8_t)vtrn2q_u64((uint64x2_t)y24, (uint64x2_t)y25); \
+                                                                    \
+    y16 = vtrn1q_u16((uint16x8_t)y[i + 4], (uint16x8_t)y[i + 5]);   \
+    y18 = vtrn1q_u16((uint16x8_t)y[i + 6], (uint16x8_t)y[i + 7]);   \
+    y24 = (uint16x8_t)vtrn1q_u32((uint32x4_t)y16, (uint32x4_t)y18); \
+    y25 = (uint16x8_t)vtrn2q_u32((uint32x4_t)y16, (uint32x4_t)y18); \
+    y12 = (uint16x8_t)vtrn1q_u64((uint64x2_t)y24, (uint64x2_t)y25); \
+    y13 = (uint16x8_t)vtrn2q_u64((uint64x2_t)y24, (uint64x2_t)y25); \
+                                                                    \
+    x.val[0] = (int16x8_t)y10;                                      \
+    x.val[1] = (int16x8_t)y11;                                      \
+    x.val[2] = (int16x8_t)y12;                                      \
+    x.val[3] = (int16x8_t)y13;
 
 static 
 void neon_cbd2(poly *r, const uint8_t buf[2 * KYBER_N / 4])
@@ -220,254 +220,191 @@ void neon_cbd2(poly *r, const uint8_t buf[2 * KYBER_N / 4])
 static 
 void neon_cbd3(poly *r, const uint8_t buf[3 * KYBER_N / 4])
 {
-    uint32x4_t a, b, d1, d2, za16_tmp, zb16_tmp; // 4
-    int32x4_t c[8];                              // 8
-    int16x8x4_t c_out;                           // 4
+    uint32x4_t a, b;   // 2
+    int32x4_t c[16];   // 16
+    int16x8x4_t c_out; // 4
+    // permutation registers
+    uint16x8_t y16, y18, y10, y11, y12, y13, y24, y25;
+    uint8x16x3_t neon_buf; // 3
+    uint8x16x4_t idx;      // 4
+    const uint8_t ptr_idx[64] = {0, 1, 2, -1, 3, 4, 5, -1, 6, 7, 8, -1, 9, 10, 11, -1,
+                                 12, 13, 14, -1, 15, 16, 17, -1, 18, 19, 20, -1, 21, 22, 23, -1,
+                                 24, 25, 26, -1, 27, 28, 29, -1, 30, 31, 32, -1, 33, 34, 35, -1,
+                                 36, 37, 38, -1, 39, 40, 41, -1, 42, 43, 44, -1, 45, 46, 47, -1};
 
-    uint8x16x3_t neon_buf;                       // 3
-    uint8x16_t aa[3], bb[3], cc[3];              // 9
-    uint8x16_t a_tmp, b_tmp;                     // 2
-    uint32x4_t const_0x7;                        // 1
-    uint8x16_t  const_0x49, const_0x92,
-                const_0x24, const_0x48,
-                const_0x01, const_0x90,
-                const_0x02;                      // 7
-    uint16x8_t sum[6], a16_tmp, b16_tmp;         // 8
-    uint16x8_t y16, y18;
-    int16x8_t y10, y11, y12, y13, y24, y25;
+    uint32x4_t const_0x7, const_0x00249249; // 2
     const_0x7 = vdupq_n_u32(0x7);
-    const_0x49 = vdupq_n_u8(0x49);
-    const_0x92 = vdupq_n_u8(0x92);
-    const_0x24 = vdupq_n_u8(0x24);
-    const_0x48 = vdupq_n_u8(0x48);
-    const_0x01 = vdupq_n_u8(0x01);
-    const_0x02 = vdupq_n_u8(0x02);
-    const_0x90 = vdupq_n_u8(0x90);
+    const_0x00249249 = vdupq_n_u32(0x00249249);
+    idx = vld1q_u8_x4(ptr_idx);
+
+    uint32x4x4_t t, d, tmp; // 12
 
     int j = 0;
     // Total SIMD registers: 30 (as checked in assembly -O3)
     for (int i = 0; i < 3 * KYBER_N / 4; i += 16 * 3)
     {
-        // 0, 3, 6, ... a
-        // 1, 4, 7, ... b
-        // 2, 5, 8, ... c
+        // 0x00, 0x01, 0x02, ...
+        // 0x10, 0x11, 0x12, ...
+        // 0x20, 0x21, 0x22, ...
         vload3(neon_buf, &buf[i]);
-        // aa[0] = a & 0x49;
-        // bb[0] = b & 0x92;
-        // cc[0] = c & 0x24;
-        vand8(aa[0], neon_buf.val[0], const_0x49);
-        vand8(bb[0], neon_buf.val[1], const_0x92);
-        vand8(cc[0], neon_buf.val[2], const_0x24);
 
-        // aa[1] = (a & 0x92) >> 1;
-        // bb[1] = (b & 0x24) >> 1;
-        // cc[1] = (c & 0x48) >> 1;
-        // bb[1] |= (c & 0x1) << 7;
-        vand8(aa[1], neon_buf.val[0], const_0x92);
-        vand8(bb[1], neon_buf.val[1], const_0x24);
-        vand8(cc[1], neon_buf.val[2], const_0x48);
-        vsr8(aa[1], aa[1], 1);
-        vsr8(cc[1], cc[1], 1);
-        // (bb[1] |= (c & 0x1) << 7;
-        vand8(b_tmp, neon_buf.val[2], const_0x01);
-        vsl8(b_tmp, b_tmp, 7);
-        vsri8(bb[1], b_tmp, bb[1], 1);
+        t.val[0] = (uint32x4_t)vqtbl3q_u8(neon_buf, idx.val[0]);
+        t.val[1] = (uint32x4_t)vqtbl3q_u8(neon_buf, idx.val[1]);
+        t.val[2] = (uint32x4_t)vqtbl3q_u8(neon_buf, idx.val[2]);
+        t.val[3] = (uint32x4_t)vqtbl3q_u8(neon_buf, idx.val[3]);
 
-        // aa[2] =  (a & 0x24) >> 2;
-        // bb[2] =  (b & 0x48) >> 2;
-        // cc[2] =  (c & 0x90) >> 2;
-        // aa[2] |= (b & 0x1) << 6;
-        // bb[2] |= ( (c & 0x2) >> 1 ) << 7;
-        vand8(aa[2], neon_buf.val[0], const_0x24);
-        vand8(bb[2], neon_buf.val[1], const_0x48);
-        vand8(cc[2], neon_buf.val[2], const_0x90);
-        vsr8(cc[2], cc[2], 2);
+        // d = t & 0x00249249
+        vand(d.val[0], t.val[0], const_0x00249249);
+        vand(d.val[1], t.val[1], const_0x00249249);
+        vand(d.val[2], t.val[2], const_0x00249249);
+        vand(d.val[3], t.val[3], const_0x00249249);
 
-        // aa[2] |= (b & 0x1) << 6;
-        // bb[2] |= (c & 0x2) << 6;
-        vand8(a_tmp, neon_buf.val[1], const_0x01);
-        vand8(b_tmp, neon_buf.val[2], const_0x02);
-        vsl8(a_tmp, a_tmp, 6);
-        vsl8(b_tmp, b_tmp, 6);
-        vsri8(aa[2], a_tmp, aa[2], 2);
-        vsri8(bb[2], b_tmp, bb[2], 2);
+        // d += (t >> 1) & 0x00249249
+        vsr(tmp.val[0], t.val[0], 1);
+        vsr(tmp.val[1], t.val[1], 1);
+        vsr(tmp.val[2], t.val[2], 1);
+        vsr(tmp.val[3], t.val[3], 1);
 
-        // sum[0,3] = aa[0] + aa[1] + aa[2];
-        // sum[1,4] = bb[0] + bb[1] + bb[2];
-        // sum[2,5] = cc[0] + cc[1] + cc[2];
-        sum[0] = vaddl_u8(vget_low_u8(aa[0]), vget_low_u8(aa[1]));
-        sum[1] = vaddl_u8(vget_low_u8(bb[0]), vget_low_u8(bb[1]));
-        sum[2] = vaddl_u8(vget_low_u8(cc[0]), vget_low_u8(cc[1]));
-        sum[3] = vaddl_high_u8(aa[0], aa[1]);
-        sum[4] = vaddl_high_u8(bb[0], bb[1]);
-        sum[5] = vaddl_high_u8(cc[0], cc[1]);
+        vand(tmp.val[0], tmp.val[0], const_0x00249249);
+        vand(tmp.val[1], tmp.val[1], const_0x00249249);
+        vand(tmp.val[2], tmp.val[2], const_0x00249249);
+        vand(tmp.val[3], tmp.val[3], const_0x00249249);
 
-        sum[0] = vaddw_u8(sum[0], vget_low_u8(aa[2]));
-        sum[1] = vaddw_u8(sum[1], vget_low_u8(bb[2]));
-        sum[2] = vaddw_u8(sum[2], vget_low_u8(cc[2]));
-        sum[3] = vaddw_high_u8(sum[3], aa[2]);
-        sum[4] = vaddw_high_u8(sum[4], bb[2]);
-        sum[5] = vaddw_high_u8(sum[5], cc[2]);
+        vadd(d.val[0], d.val[0], tmp.val[0]);
+        vadd(d.val[1], d.val[1], tmp.val[1]);
+        vadd(d.val[2], d.val[2], tmp.val[2]);
+        vadd(d.val[3], d.val[3], tmp.val[3]);
 
-        // sum[1,4] = (sum[0,3] >> 8) + sum[1,4];
-        vsr16(a16_tmp, sum[0], 8);
-        vsr16(b16_tmp, sum[3], 8);
-        vadd16(sum[1], sum[1], a16_tmp);
-        vadd16(sum[4], sum[4], b16_tmp);
-        // sum[2,5] = (sum[1,4] >> 8) + sum2;
-        vsr16(a16_tmp, sum[1], 8);
-        vsr16(b16_tmp, sum[4], 8);
-        vadd16(sum[2], sum[2], a16_tmp);
-        vadd16(sum[5], sum[5], b16_tmp);
+        // d += (t >>2 ) & 0x00249249
+        vsr(tmp.val[0], t.val[0], 2);
+        vsr(tmp.val[1], t.val[1], 2);
+        vsr(tmp.val[2], t.val[2], 2);
+        vsr(tmp.val[3], t.val[3], 2);
 
-        // sum[0] | (sum[1] << 8)
-        // sum[3] | (sum[4] << 8)
-        a_tmp = (uint8x16_t)sum[0];
-        b_tmp = (uint8x16_t)sum[1];
-        a16_tmp = (uint16x8_t)vtrn1q_u8((uint8x16_t)sum[0], (uint8x16_t)sum[1]);
-        b16_tmp = (uint16x8_t)vtrn1q_u8((uint8x16_t)sum[3], (uint8x16_t)sum[4]);
+        vand(tmp.val[0], tmp.val[0], const_0x00249249);
+        vand(tmp.val[1], tmp.val[1], const_0x00249249);
+        vand(tmp.val[2], tmp.val[2], const_0x00249249);
+        vand(tmp.val[3], tmp.val[3], const_0x00249249);
 
-        // sum[0] | (sum[1] << 8) | (sum[2] << 16)
-        // sum[3] | (sum[4] << 8) | (sum[5] << 16)
-        za16_tmp = (uint32x4_t)vtrn1q_u16(a16_tmp, sum[2]);
-        zb16_tmp = (uint32x4_t)vtrn2q_u16(a16_tmp, sum[2]);
-
-        d1 = vzip1q_u32(za16_tmp, zb16_tmp);
-        d2 = vzip2q_u32(za16_tmp, zb16_tmp);
+        vadd(d.val[0], d.val[0], tmp.val[0]);
+        vadd(d.val[1], d.val[1], tmp.val[1]);
+        vadd(d.val[2], d.val[2], tmp.val[2]);
+        vadd(d.val[3], d.val[3], tmp.val[3]);
 
         // C1
         // 1st iter
-        vsr(b, d1, 3);
-        vand(a, d1, const_0x7);
+        vsr(b, d.val[0], 3);
+        vand(a, d.val[0], const_0x7);
         vand(b, b, const_0x7);
         vsub(c[0], (int32x4_t)a, (int32x4_t)b);
 
         // 2nd iter
-        vsr(a, d1, 6);
-        vsr(b, d1, 9);
+        vsr(a, d.val[0], 6);
+        vsr(b, d.val[0], 9);
         vand(a, a, const_0x7);
         vand(b, b, const_0x7);
         vsub(c[1], (int32x4_t)a, (int32x4_t)b);
 
         // 3rd iter
-        vsr(a, d1, 12);
-        vsr(b, d1, 15);
+        vsr(a, d.val[0], 12);
+        vsr(b, d.val[0], 15);
         vand(a, a, const_0x7);
         vand(b, b, const_0x7);
         vsub(c[2], (int32x4_t)a, (int32x4_t)b);
 
         // 3rd iter
-        vsr(a, d1, 18);
-        vsr(b, d1, 21);
+        vsr(a, d.val[0], 18);
+        vsr(b, d.val[0], 21);
         vand(a, a, const_0x7);
         vand(b, b, const_0x7);
         vsub(c[3], (int32x4_t)a, (int32x4_t)b);
 
         // 4th iter
-        vsr(b, d2, 3);
-        vand(a, d2, const_0x7);
+        vsr(b, d.val[1], 3);
+        vand(a, d.val[1], const_0x7);
         vand(b, b, const_0x7);
         vsub(c[4], (int32x4_t)a, (int32x4_t)b);
 
         // 5th iter
-        vsr(a, d2, 6);
-        vsr(b, d2, 9);
+        vsr(a, d.val[1], 6);
+        vsr(b, d.val[1], 9);
         vand(a, a, const_0x7);
         vand(b, b, const_0x7);
         vsub(c[5], (int32x4_t)a, (int32x4_t)b);
 
         // 6th iter
-        vsr(a, d2, 12);
-        vsr(b, d2, 15);
+        vsr(a, d.val[1], 12);
+        vsr(b, d.val[1], 15);
         vand(a, a, const_0x7);
         vand(b, b, const_0x7);
         vsub(c[6], (int32x4_t)a, (int32x4_t)b);
 
         // 7th iter
-        vsr(a, d2, 18);
-        vsr(b, d2, 21);
+        vsr(a, d.val[1], 18);
+        vsr(b, d.val[1], 21);
         vand(a, a, const_0x7);
         vand(b, b, const_0x7);
         vsub(c[7], (int32x4_t)a, (int32x4_t)b);
 
-        // c[0]: x | 12 | x |  8 -- x | 4  | x | 0
-        // c[1]: x | 13 | x |  9 -- x | 5  | x | 1
-        // c[2]: x | 14 | x | 10 -- x | 6  | x | 2
-        // c[3]: x | 15 | x | 11 -- x | 7  | x | 3
-        // c[4]: x | 28 | x | 24 -- x | 20 | x | 16
-        // c[5]: x | 29 | x | 25 -- x | 21 | x | 17
-        // c[6]: x | 30 | x | 26 -- x | 22 | x | 19
-        // c[7]: x | 31 | x | 27 -- x | 23 | x | 19
-        transpose4x8(c_out, c);
+        // C2
+        // 1st iter
+        vsr(b, d.val[2], 3);
+        vand(a, d.val[2], const_0x7);
+        vand(b, b, const_0x7);
+        vsub(c[8], (int32x4_t)a, (int32x4_t)b);
 
+        // 2nd iter
+        vsr(a, d.val[2], 6);
+        vsr(b, d.val[2], 9);
+        vand(a, a, const_0x7);
+        vand(b, b, const_0x7);
+        vsub(c[9], (int32x4_t)a, (int32x4_t)b);
+
+        // 3rd iter
+        vsr(a, d.val[2], 12);
+        vsr(b, d.val[2], 15);
+        vand(a, a, const_0x7);
+        vand(b, b, const_0x7);
+        vsub(c[10], (int32x4_t)a, (int32x4_t)b);
+
+        // 3rd iter
+        vsr(a, d.val[2], 18);
+        vsr(b, d.val[2], 21);
+        vand(a, a, const_0x7);
+        vand(b, b, const_0x7);
+        vsub(c[11], (int32x4_t)a, (int32x4_t)b);
+
+        // 4th iter
+        vsr(b, d.val[3], 3);
+        vand(a, d.val[3], const_0x7);
+        vand(b, b, const_0x7);
+        vsub(c[12], (int32x4_t)a, (int32x4_t)b);
+
+        // 5th iter
+        vsr(a, d.val[3], 6);
+        vsr(b, d.val[3], 9);
+        vand(a, a, const_0x7);
+        vand(b, b, const_0x7);
+        vsub(c[13], (int32x4_t)a, (int32x4_t)b);
+
+        // 6th iter
+        vsr(a, d.val[3], 12);
+        vsr(b, d.val[3], 15);
+        vand(a, a, const_0x7);
+        vand(b, b, const_0x7);
+        vsub(c[14], (int32x4_t)a, (int32x4_t)b);
+
+        // 7th iter
+        vsr(a, d.val[3], 18);
+        vsr(b, d.val[3], 21);
+        vand(a, a, const_0x7);
+        vand(b, b, const_0x7);
+        vsub(c[15], (int32x4_t)a, (int32x4_t)b);
+
+        transpose4x8(c_out, c, 0);
         vstore(&r->coeffs[j], c_out);
         j += 32;
-
-        // Use all value in SIMD register
-
-        za16_tmp = (uint32x4_t)vtrn1q_u16(b16_tmp, sum[5]);
-        zb16_tmp = (uint32x4_t)vtrn2q_u16(b16_tmp, sum[5]);
-
-        d1 = vzip1q_u32(za16_tmp, zb16_tmp);
-        d2 = vzip2q_u32(za16_tmp, zb16_tmp);
-
-        // C1
-        // 1st iter
-        vsr(b, d1, 3);
-        vand(a, d1, const_0x7);
-        vand(b, b, const_0x7);
-        vsub(c[0], (int32x4_t)a, (int32x4_t)b);
-
-        // 2nd iter
-        vsr(a, d1, 6);
-        vsr(b, d1, 9);
-        vand(a, a, const_0x7);
-        vand(b, b, const_0x7);
-        vsub(c[1], (int32x4_t)a, (int32x4_t)b);
-
-        // 3rd iter
-        vsr(a, d1, 12);
-        vsr(b, d1, 15);
-        vand(a, a, const_0x7);
-        vand(b, b, const_0x7);
-        vsub(c[2], (int32x4_t)a, (int32x4_t)b);
-
-        // 3rd iter
-        vsr(a, d1, 18);
-        vsr(b, d1, 21);
-        vand(a, a, const_0x7);
-        vand(b, b, const_0x7);
-        vsub(c[3], (int32x4_t)a, (int32x4_t)b);
-
-        // 4th iter
-        vsr(b, d2, 3);
-        vand(a, d2, const_0x7);
-        vand(b, b, const_0x7);
-        vsub(c[4], (int32x4_t)a, (int32x4_t)b);
-
-        // 5th iter
-        vsr(a, d2, 6);
-        vsr(b, d2, 9);
-        vand(a, a, const_0x7);
-        vand(b, b, const_0x7);
-        vsub(c[5], (int32x4_t)a, (int32x4_t)b);
-
-        // 6th iter
-        vsr(a, d2, 12);
-        vsr(b, d2, 15);
-        vand(a, a, const_0x7);
-        vand(b, b, const_0x7);
-        vsub(c[6], (int32x4_t)a, (int32x4_t)b);
-
-        // 7th iter
-        vsr(a, d2, 18);
-        vsr(b, d2, 21);
-        vand(a, a, const_0x7);
-        vand(b, b, const_0x7);
-        vsub(c[7], (int32x4_t)a, (int32x4_t)b);
-
-        transpose4x8(c_out, c);
-
+        transpose4x8(c_out, c, 8);
         vstore(&r->coeffs[j], c_out);
         j += 32;
     }
