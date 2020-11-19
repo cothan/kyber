@@ -1,14 +1,14 @@
-CC ?= /usr/bin/clang
+CC ?= /usr/bin/gcc
 CFLAGS += -Wall -Wextra -Wpedantic -Wmissing-prototypes -Wredundant-decls \
-  -Wshadow -Wpointer-arith -O3 -march=native -fomit-frame-pointer -lpapi
+  -Wshadow -Wpointer-arith -O0 -march=native -fomit-frame-pointer -lpapi -g3
 NISTFLAGS += -Wno-unused-result -O3
 RM = /bin/rm
 
-SOURCES = kem.c indcpa.c neon_cbd.c neon_symmetric-shake.c neon_polyvec.c neon_poly.c polyvec.c poly.c reduce.c neon_ntt.c ntt.c cbd.c verify.c
+SOURCES = kem.c indcpa.c rejsample.c neon_cbd.c neon_symmetric-shake.c neon_polyvec.c neon_poly.c polyvec.c poly.c reduce.c neon_ntt.c ntt.c cbd.c verify.c
 SOURCESKECCAK = $(SOURCES) fips202x2.c fips202.c symmetric-shake.c
 SOURCESNINETIES = $(SOURCES) sha256.c sha512.c aes256ctr.c symmetric-aes.c
 HEADERS = params.h api.h indcpa.h polyvec.h poly.h reduce.h ntt.h cbd.h \
-  verify.h symmetric.h randombytes.h fips202x2.h
+  verify.h symmetric.h randombytes.h fips202x2.h rejsample.h
 HEADERSKECCAK = $(HEADERS) fips202.h fips202x2.h
 HEADERSNINETIES = $(HEADERS) aes256ctr.h sha2.h
 
