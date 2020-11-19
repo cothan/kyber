@@ -1,7 +1,9 @@
 #include <arm_neon.h>
 #include "params.h"
+#include "symmetric.h"
 #include <stdio.h>
 
+// Define NEON operation
 // Load 8x16
 #define vload(c, ptr) c = vld1q_u16(ptr);
 
@@ -34,6 +36,12 @@
 
 // Compare less or equal out = 1 ? a>c : 0
 #define vcompare8(out, a, c) out = vcle_u16(a, c);
+// End 
+
+#define GEN_MATRIX_NBLOCKS ((12*KYBER_N/8*(1 << 12)/KYBER_Q \
+                             + XOF_BLOCKBYTES)/XOF_BLOCKBYTES)
+
+#define UPPER_BOUND (GEN_MATRIX_NBLOCKS*XOF_BLOCKBYTES)
 
 static const uint8_t table_idx[256][16] = {
     {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1}, // 0
@@ -313,6 +321,21 @@ static const uint8_t table_idx_small[16][8] = {
     {0, 1, 2, 3, 4, 5, 6, 7},         // 15
 };
 
+/*************************************************
+* Name:        rej_uniform
+*
+* Description: Run rejection sampling on uniform random bytes to generate
+*              uniform random integers mod q
+*
+* Arguments:   - int16_t *r:          pointer to output buffer
+*              - unsigned int len:    requested number of 16-bit integers
+*                                     (uniform mod q)
+*              - const uint8_t *buf:  pointer to input buffer
+*                                     (assumed to be uniform random bytes)
+*              - unsigned int buflen: length of input buffer in bytes
+*
+* Returns number of sampled 16-bit integers (at most len)
+**************************************************/
 unsigned int rej_uniform(int16_t *r,
                          unsigned int len,
                          const uint8_t *buf,
@@ -337,12 +360,19 @@ unsigned int rej_uniform(int16_t *r,
     return ctr;
 }
 
-#define BOUND 480
-
-unsigned int neon_rej_uniform(int16_t *r,
-                              unsigned int len,
-                              const uint8_t *buf,
-                              unsigned int buflen)
+/*************************************************
+* Name:        neon_rej_uniform
+*
+* Description: Run rejection sampling on uniform random bytes to generate
+*              uniform random integers mod q
+*
+* Arguments:   - int16_t *r:          pointer to output buffer length KYBER_N
+*              - const uint8_t *buf:  pointer to input buffer
+*                                     (assumed to be uniform random bytes)
+*
+* Returns number of sampled 16-bit integers (at most len)
+**************************************************/
+unsigned int neon_rej_uniform(int16_t *r, const uint8_t *buf)
 {
     uint8x16x3_t neon_buf;
     uint16x8x4_t tmp, value, sign;
@@ -358,8 +388,7 @@ unsigned int neon_rej_uniform(int16_t *r,
     unsigned int reduce_indexes[4], ctr[4];
     unsigned int i, count = 0;
 
-    // !TODO: replace hardcode 480
-    for (i = 0; i < BOUND && count < len; i += 48)
+    for (i = 0; i < (UPPER_BOUND/48)*48 && count < KYBER_N - 32; i += 48)
     {
         // 0, 3, 6, 9
         // 1, 4, 7, 10
@@ -422,13 +451,17 @@ unsigned int neon_rej_uniform(int16_t *r,
 
         vstore(&r[count], (int16x8_t)value.val[0]);
         count += ctr[0];
+        // if (count >= KYBER_N - 8) break;
         vstore(&r[count], (int16x8_t)value.val[1]);
         count += ctr[1];
+        // if (count >= KYBER_N - 8) break;
         vstore(&r[count], (int16x8_t)value.val[2]);
         count += ctr[2];
+        // if (count >= KYBER_N - 8) break;
         vstore(&r[count], (int16x8_t)value.val[3]);
         count += ctr[3];
     }
+    // printf("COUNT %d: %d\n", i, count);
 
     uint8x8x3_t neon_buf8;
     uint16x4x4_t tmp8, value8, sign8;
@@ -438,9 +471,110 @@ unsigned int neon_rej_uniform(int16_t *r,
     const8_0xfff = vdup_n_u16(0xfff);
     neon_bit8 = vld1_u16(bit_table);
 
-    if (count < KYBER_N)
+    int16_t local_buf[48];
+    unsigned int local_index = 0;
+    do
     {
-        neon_buf8 = vld3_u8(&buf[BOUND]);
+        neon_buf8 = vld3_u8(&buf[i]);
+
+        // Val0: 0-1 | 3-4 | 6-7| 9-10
+        tmp8.val[0] = (uint16x4_t)vzip1_u8(neon_buf8.val[0], neon_buf8.val[1]);
+        tmp8.val[1] = (uint16x4_t)vzip2_u8(neon_buf8.val[0], neon_buf8.val[1]);
+
+        vand8(tmp8.val[0], tmp8.val[0], const8_0xfff);
+        vand8(tmp8.val[1], tmp8.val[1], const8_0xfff);
+
+        // Val1: 1-2 | 4-5 | 7-8 | 10-11
+        tmp8.val[2] = (uint16x4_t)vzip1_u8(neon_buf8.val[1], neon_buf8.val[2]);
+        tmp8.val[3] = (uint16x4_t)vzip2_u8(neon_buf8.val[1], neon_buf8.val[2]);
+
+        vsr8(tmp8.val[2], tmp8.val[2], 4);
+        vsr8(tmp8.val[3], tmp8.val[3], 4);
+
+        // Final value
+        value8.val[0] = vzip1_u16(tmp8.val[0], tmp8.val[2]);
+        value8.val[1] = vzip2_u16(tmp8.val[0], tmp8.val[2]);
+        value8.val[2] = vzip1_u16(tmp8.val[1], tmp8.val[3]);
+        value8.val[3] = vzip2_u16(tmp8.val[1], tmp8.val[3]);
+
+        // Compare unsigned less than equal
+        vcompare8(sign8.val[0], value8.val[0], const8_kyberq);
+        vcompare8(sign8.val[1], value8.val[1], const8_kyberq);
+        vcompare8(sign8.val[2], value8.val[2], const8_kyberq);
+        vcompare8(sign8.val[3], value8.val[3], const8_kyberq);
+
+        // Prepare indexes for table idx
+        vand8(sign8.val[0], sign8.val[0], neon_bit8);
+        vand8(sign8.val[1], sign8.val[1], neon_bit8);
+        vand8(sign8.val[2], sign8.val[2], neon_bit8);
+        vand8(sign8.val[3], sign8.val[3], neon_bit8);
+
+        // Add across vector
+        reduce_indexes[0] = vaddv_u16(sign8.val[0]);
+        reduce_indexes[1] = vaddv_u16(sign8.val[1]);
+        reduce_indexes[2] = vaddv_u16(sign8.val[2]);
+        reduce_indexes[3] = vaddv_u16(sign8.val[3]);
+
+        ctr[0] = __builtin_popcount(reduce_indexes[0]);
+        ctr[1] = __builtin_popcount(reduce_indexes[1]);
+        ctr[2] = __builtin_popcount(reduce_indexes[2]);
+        ctr[3] = __builtin_popcount(reduce_indexes[3]);
+
+        neon_table8.val[0] = vld1_u8(table_idx_small[reduce_indexes[0]]);
+        neon_table8.val[1] = vld1_u8(table_idx_small[reduce_indexes[1]]);
+        neon_table8.val[2] = vld1_u8(table_idx_small[reduce_indexes[2]]);
+        neon_table8.val[3] = vld1_u8(table_idx_small[reduce_indexes[3]]);
+
+        // Table-based permute
+        vtable8(value8.val[0], (uint8x8_t)value8.val[0], neon_table8.val[0]);
+        vtable8(value8.val[1], (uint8x8_t)value8.val[1], neon_table8.val[1]);
+        vtable8(value8.val[2], (uint8x8_t)value8.val[2], neon_table8.val[2]);
+        vtable8(value8.val[3], (uint8x8_t)value8.val[3], neon_table8.val[3]);
+
+        vstore8(&local_buf[local_index], (int16x4_t)value8.val[0]);
+        local_index += ctr[0];
+        vstore8(&local_buf[local_index], (int16x4_t)value8.val[1]);
+        local_index += ctr[1];
+        vstore8(&local_buf[local_index], (int16x4_t)value8.val[2]);
+        local_index += ctr[2];
+        vstore8(&local_buf[local_index], (int16x4_t)value8.val[3]);
+        local_index += ctr[3];
+
+        // printf("LOOP %d: %d < %d \n", i, local_index, KYBER_N - count);
+
+        i += 24;
+
+    } while ((local_index < KYBER_N - count) && (i < UPPER_BOUND));
+
+    for (i = 0; i < local_index && count < KYBER_N; i++)
+    {
+        r[count] = local_buf[i];
+        count++;
+    }
+
+    return count;
+}
+
+/*
+unsigned int neon_rej_uniform1(int16_t *r,
+                              unsigned int len,
+                              const uint8_t *buf,
+                              unsigned int buflen)
+{
+    uint16_t bit_table[8] = {0x1, 0x2, 0x4, 0x8, 0x10, 0x20, 0x40, 0x80};
+    uint8x8x3_t neon_buf8;
+    uint16x4x4_t tmp8, value8, sign8;
+    uint8x8x4_t neon_table8;
+    uint16x4_t const8_kyberq, neon_bit8, const8_0xfff;
+    const8_kyberq = vdup_n_u16(KYBER_Q - 1);
+    const8_0xfff = vdup_n_u16(0xfff);
+    neon_bit8 = vld1_u16(bit_table);
+    unsigned int reduce_indexes[4], ctr[4];
+    unsigned int i, count = 0;
+
+    for (i = 0; i < buflen && count < len; i += 24)
+    {
+        neon_buf8 = vld3_u8(&buf[i]);
 
         // Val0: 0-1 | 3-4 | 6-7| 9-10
         tmp8.val[0] = (uint16x4_t)vzip1_u8(neon_buf8.val[0], neon_buf8.val[1]);
@@ -504,15 +638,15 @@ unsigned int neon_rej_uniform(int16_t *r,
         count += ctr[2];
         vstore8(&r[count], (int16x4_t)value8.val[3]);
         count += ctr[3];
-        i += 24;
     }
     return count;
 }
 
-/*
+
 #include <string.h>
 #include <stdio.h>
 #include <sys/random.h>
+#include <papi.h>
 
 int compare(int16_t *r_gold, int16_t *r, int ctr0, int ctr1, const char *string)
 {
@@ -542,27 +676,61 @@ int compare(int16_t *r_gold, int16_t *r, int ctr0, int ctr1, const char *string)
 }
 
 #define SIZE 504
-#define TESTS 1000000
+#define TESTS 10000000
 
 int main(void)
 {
     uint8_t buf[SIZE];
-    int16_t r_gold[KYBER_N], r[KYBER_N + 32];
+    int16_t r_gold[KYBER_N], r1[KYBER_N + 32], r2[KYBER_N + 32];
 
-    unsigned int ctr0, ctr1;
+    unsigned int ctr0, ctr1, ctr2;
+
     for (int i = 0; i < TESTS; i++)
     {
         getrandom(buf, sizeof(buf), 0);
         ctr0 = rej_uniform(r_gold, KYBER_N, buf, SIZE);
-        ctr1 = neon_rej_uniform(r, KYBER_N, buf, SIZE);
+        ctr1 = neon_rej_uniform(r1, KYBER_N, buf, SIZE);
+        ctr2 = neon_rej_uniform1(r2, KYBER_N, buf, SIZE);
 
-        if (memcmp(r_gold, r, KYBER_N))
+        if (memcmp(r_gold, r1, KYBER_N) && memcmp(r_gold, r2, KYBER_N))
             return 1;
-        if (compare(r_gold, r, ctr0, ctr1, "NEON_SAMPLE"))
+        if (compare(r_gold, r1, ctr0, ctr1, "NEON_SAMPLE") && compare(r_gold, r2, ctr0, ctr2, "NEON_SAMPLE"))
             return 1;
     }
+    double cref, neon1, neon2;
+    long_long start, end;
+    start = PAPI_get_real_cyc();
+    for (int j = 0; j < TESTS; j++)
+    {
+        rej_uniform(r_gold, KYBER_N, buf, SIZE);
+    }
+    end = PAPI_get_real_cyc();
+    cref = ((double)(end - start)) / TESTS;
+
+    start = PAPI_get_real_cyc();
+    for (int j = 0; j < TESTS; j++)
+    {
+        neon_rej_uniform(r1, KYBER_N, buf, SIZE);
+    }
+    end = PAPI_get_real_cyc();
+    neon1 = ((double)(end - start)) / TESTS;
+
+    start = PAPI_get_real_cyc();
+    for (int j = 0; j < TESTS; j++)
+    {
+        neon_rej_uniform1(r2, KYBER_N, buf, SIZE);
+    }
+    end = PAPI_get_real_cyc();
+    neon2 = ((double)(end - start)) / TESTS;
+
+    printf("%u: %lf ---  %lf  --- %lf\n", TESTS, cref, neon1, neon2);
     return 0;
 }
+*/
+// gcc neon_sample.c -o neon_sample -g3 -O3 -Wall -Wextra -Wpedantic -fomit-frame-pointer -fwrapv -lpapi
 
-//gcc neon_sample.c -o neon_sample -g3 -O3 -Wall -Wextra -Wpedantic
+/* 
+TESTS:     C REF    ---  NEON Style --- NEON Style1
+10000000: 43.446947 ---  19.741952  --- 30.320689
+2x faster
 */
