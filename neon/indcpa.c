@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "params.h"
+#include "rejsample.h"
 #include "indcpa.h"
 #include "poly.h"
 #include "polyvec.h"
@@ -117,43 +118,6 @@ static void unpack_ciphertext(polyvec *b,
   poly_decompress(v, c+KYBER_POLYVECCOMPRESSEDBYTES);
 }
 
-/*************************************************
-* Name:        rej_uniform
-*
-* Description: Run rejection sampling on uniform random bytes to generate
-*              uniform random integers mod q
-*
-* Arguments:   - int16_t *r:          pointer to output buffer
-*              - unsigned int len:    requested number of 16-bit integers
-*                                     (uniform mod q)
-*              - const uint8_t *buf:  pointer to input buffer
-*                                     (assumed to be uniform random bytes)
-*              - unsigned int buflen: length of input buffer in bytes
-*
-* Returns number of sampled 16-bit integers (at most len)
-**************************************************/
-static unsigned int rej_uniform(int16_t *r,
-                                unsigned int len,
-                                const uint8_t *buf,
-                                unsigned int buflen)
-{
-  unsigned int ctr, pos;
-  uint16_t val0, val1;
-
-  ctr = pos = 0;
-  while(ctr < len && pos + 3 <= buflen) {
-    val0 = ((buf[pos+0] >> 0) | ((uint16_t)buf[pos+1] << 8)) & 0xFFF;
-    val1 = ((buf[pos+1] >> 4) | ((uint16_t)buf[pos+2] << 4)) & 0xFFF;
-    pos += 3;
-
-    if(val0 < KYBER_Q)
-      r[ctr++] = val0;
-    if(ctr < len && val1 < KYBER_Q)
-      r[ctr++] = val1;
-  }
-
-  return ctr;
-}
 
 #define gen_a(A,B)  gen_matrix(A,B,0)
 #define gen_at(A,B) gen_matrix(A,B,1)
@@ -176,32 +140,171 @@ static unsigned int rej_uniform(int16_t *r,
 // Not static for benchmarking
 void gen_matrix(polyvec *a, const uint8_t seed[KYBER_SYMBYTES], int transposed)
 {
-  unsigned int ctr, i, j, k;
+  unsigned int ctr0, ctr1, k;
   unsigned int buflen, off;
-  uint8_t buf[GEN_MATRIX_NBLOCKS*XOF_BLOCKBYTES+2];
-  xof_state state;
+  uint8_t buf0[GEN_MATRIX_NBLOCKS * XOF_BLOCKBYTES + 2],
+      buf1[GEN_MATRIX_NBLOCKS * XOF_BLOCKBYTES + 2];
+  neon_xof_state state;
 
-  for(i=0;i<KYBER_K;i++) {
-    for(j=0;j<KYBER_K;j++) {
-      if(transposed)
-        xof_absorb(&state, seed, i, j);
+#if KYBER_K == 2
+  for (unsigned int i = 0; i < KYBER_K; i++)
+  {
+    if (transposed)
+      neon_xof_absorb(&state, seed, i, i, 0, 1);
+    else
+      neon_xof_absorb(&state, seed, 0, 1, i, i);
+
+    neon_xof_squeezeblocks(buf0, buf1, GEN_MATRIX_NBLOCKS, &state);
+
+    buflen = GEN_MATRIX_NBLOCKS * XOF_BLOCKBYTES;
+
+    ctr0 = neon_rej_uniform(a[i].vec[0].coeffs, buf0);
+    ctr1 = neon_rej_uniform(a[i].vec[1].coeffs, buf1);
+    while (ctr0 < KYBER_N || ctr1 < KYBER_N)
+    {
+      off = buflen % 3;
+      for (k = 0; k < off; k++)
+      {
+        buf0[k] = buf0[buflen - off + k];
+        buf1[k] = buf1[buflen - off + k];
+      }
+      neon_xof_squeezeblocks(buf0 + off, buf1 + off, 1, &state);
+
+      buflen = off + XOF_BLOCKBYTES;
+      ctr0 += rej_uniform(a[i].vec[0].coeffs + ctr0, KYBER_N - ctr0, buf0, buflen);
+      ctr1 += rej_uniform(a[i].vec[1].coeffs + ctr1, KYBER_N - ctr1, buf1, buflen);
+    }
+  }
+#elif KYBER_K == 3
+  int16_t *s1 = NULL, *s2 = NULL;
+  unsigned int x1, x2, y1, y2;
+  xof_state c_state;
+
+  for (unsigned int j = 0; j < KYBER_K * KYBER_K - 1; j += 2)
+  {
+    switch (j)
+    {
+    case 0:
+      s1 = a[0].vec[0].coeffs;
+      s2 = a[0].vec[1].coeffs;
+      x1 = 0;
+      y1 = 0;
+      x2 = 0;
+      y2 = 1;
+      break;
+    case 2:
+      s1 = a[0].vec[2].coeffs;
+      s2 = a[1].vec[0].coeffs;
+      x1 = 0;
+      y1 = 2;
+      x2 = 1;
+      y2 = 0;
+      break;
+    case 4:
+      s1 = a[1].vec[1].coeffs;
+      s2 = a[1].vec[2].coeffs;
+      x1 = 1;
+      y1 = 1;
+      x2 = 1;
+      y2 = 2;
+      break;
+    default:
+      s1 = a[2].vec[0].coeffs;
+      s2 = a[2].vec[1].coeffs;
+      x1 = 2;
+      y1 = 0;
+      x2 = 2;
+      y2 = 1;
+      break;
+    }
+
+    if (transposed)
+      neon_xof_absorb(&state, seed, x1, x2, y1, y2);
+    else
+      neon_xof_absorb(&state, seed, y1, y2, x1, x2);
+
+    neon_xof_squeezeblocks(buf0, buf1, GEN_MATRIX_NBLOCKS, &state);
+
+    buflen = GEN_MATRIX_NBLOCKS * XOF_BLOCKBYTES;
+
+    ctr0 = neon_rej_uniform(s1, buf0);
+    ctr1 = neon_rej_uniform(s2, buf1);
+
+    while (ctr0 < KYBER_N || ctr1 < KYBER_N)
+    {
+      off = buflen % 3;
+      for (k = 0; k < off; k++)
+      {
+        buf0[k] = buf0[buflen - off + k];
+        buf1[k] = buf1[buflen - off + k];
+      }
+      neon_xof_squeezeblocks(buf0 + off, buf1 + off, 1, &state);
+
+      buflen = off + XOF_BLOCKBYTES;
+      ctr0 += rej_uniform(s1 + ctr0, KYBER_N - ctr0, buf0, buflen);
+      ctr1 += rej_uniform(s2 + ctr1, KYBER_N - ctr1, buf1, buflen);
+    }
+  }
+
+  // Last iteration [2][2]
+  if (transposed)
+    xof_absorb(&c_state, seed, 2, 2);
+  else
+    xof_absorb(&c_state, seed, 2, 2);
+
+  xof_squeezeblocks(buf0, GEN_MATRIX_NBLOCKS, &c_state);
+
+  buflen = GEN_MATRIX_NBLOCKS * XOF_BLOCKBYTES;
+
+  ctr0 = neon_rej_uniform(a[2].vec[2].coeffs, buf0);
+
+  while (ctr0 < KYBER_N)
+  {
+    off = buflen % 3;
+    for (k = 0; k < off; k++)
+    {
+      buf0[k] = buf0[buflen - off + k];
+    }
+    xof_squeezeblocks(buf0 + off, 1, &c_state);
+
+    buflen = off + XOF_BLOCKBYTES;
+    ctr0 += rej_uniform(a[2].vec[2].coeffs + ctr0, KYBER_N - ctr0, buf0, buflen);
+  }
+
+#elif KYBER_K == 4
+  for (unsigned int i = 0; i < KYBER_K; i++)
+  {
+    for (unsigned int j = 0; j < KYBER_K; j += 2)
+    {
+      if (transposed)
+        neon_xof_absorb(&state, seed, i, i, j, j + 1);
       else
-        xof_absorb(&state, seed, j, i);
+        neon_xof_absorb(&state, seed, j, j + 1, i, i);
 
-      xof_squeezeblocks(buf, GEN_MATRIX_NBLOCKS, &state);
-      buflen = GEN_MATRIX_NBLOCKS*XOF_BLOCKBYTES;
-      ctr = rej_uniform(a[i].vec[j].coeffs, KYBER_N, buf, buflen);
+      neon_xof_squeezeblocks(buf0, buf1, GEN_MATRIX_NBLOCKS, &state);
+      buflen = GEN_MATRIX_NBLOCKS * XOF_BLOCKBYTES;
+      ctr0 = neon_rej_uniform(a[i].vec[j].coeffs, buf0);
+      ctr1 = neon_rej_uniform(a[i].vec[j + 1].coeffs, buf1);
 
-      while(ctr < KYBER_N) {
+      while (ctr0 < KYBER_N || ctr1 < KYBER_N)
+      {
         off = buflen % 3;
-        for(k = 0; k < off; k++)
-          buf[k] = buf[buflen - off + k];
-        xof_squeezeblocks(buf + off, 1, &state);
+        for (k = 0; k < off; k++)
+        {
+          buf0[k] = buf0[buflen - off + k];
+          buf1[k] = buf1[buflen - off + k];
+        }
+        neon_xof_squeezeblocks(buf0 + off, buf1 + off, 1, &state);
+
         buflen = off + XOF_BLOCKBYTES;
-        ctr += rej_uniform(a[i].vec[j].coeffs + ctr, KYBER_N - ctr, buf, buflen);
+        ctr0 += rej_uniform(a[i].vec[j].coeffs + ctr0, KYBER_N - ctr0, buf0, buflen);
+        ctr1 += rej_uniform(a[i].vec[j + 1].coeffs + ctr1, KYBER_N - ctr1, buf1, buflen);
       }
     }
   }
+#else
+#error "KYBER_K must be in {2,3,4}"
+#endif
 }
 
 /*************************************************
@@ -222,7 +325,6 @@ void indcpa_keypair(uint8_t pk[KYBER_INDCPA_PUBLICKEYBYTES],
   uint8_t buf[2*KYBER_SYMBYTES];
   const uint8_t *publicseed = buf;
   const uint8_t *noiseseed = buf+KYBER_SYMBYTES;
-  uint8_t nonce = 0;
   polyvec a[KYBER_K], e, pkpv, skpv;
 
   randombytes(buf, KYBER_SYMBYTES);
@@ -231,27 +333,17 @@ void indcpa_keypair(uint8_t pk[KYBER_INDCPA_PUBLICKEYBYTES],
   gen_a(a, publicseed);
 
 #if KYBER_K == 2
-  // ETA1 != ETA2 (3 != 2)
   neon_poly_getnoise_eta1_2x(skpv.vec + 0, skpv.vec + 1, noiseseed, 0, 1);
   neon_poly_getnoise_eta1_2x(e.vec + 0, e.vec + 1, noiseseed, 2, 3);
 #elif KYBER_K == 3
-#if KYBER_ETA1 == KYBER_ETA2
-  // Because ETA1 == ETA2 
   neon_poly_getnoise_eta1_2x(skpv.vec + 0, skpv.vec + 1, noiseseed, 0, 1);
   neon_poly_getnoise_eta1_2x(skpv.vec + 2, e.vec + 0, noiseseed, 2, 3);
   neon_poly_getnoise_eta1_2x(e.vec + 1, e.vec + 2, noiseseed, 4, 5);
-#else
-#error "We need eta1 == eta2 here"
-#endif
 #elif KYBER_K == 4
-#if KYBER_ETA1 == KYBER_ETA2
   neon_poly_getnoise_eta1_2x(skpv.vec + 0, skpv.vec + 1, noiseseed, 0, 1);
   neon_poly_getnoise_eta1_2x(skpv.vec + 2, skpv.vec + 3, noiseseed, 2, 3);
   neon_poly_getnoise_eta1_2x(e.vec + 0, e.vec + 1, noiseseed, 4, 5);
   neon_poly_getnoise_eta1_2x(e.vec + 2, e.vec + 3, noiseseed, 6, 7);
-#else
-#error "We need eta1 == eta2 here"
-#endif
 #endif
 
   neon_polyvec_ntt(&skpv);
@@ -292,7 +384,6 @@ void indcpa_enc(uint8_t c[KYBER_INDCPA_BYTES],
 {
   unsigned int i;
   uint8_t seed[KYBER_SYMBYTES];
-  uint8_t nonce = 0;
   polyvec sp, pkpv, ep, at[KYBER_K], bp;
   poly v, k, epp;
 
