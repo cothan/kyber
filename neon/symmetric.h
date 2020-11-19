@@ -76,8 +76,8 @@ void kyber_shake256_prf(uint8_t *out,
 #define neon_kyber_shake128_absorb KYBER_NAMESPACE(_neon_kyber_shake128_absorb)
 void neon_kyber_shake128_absorb(keccakx2_state *s,
                                 const uint8_t seed[KYBER_SYMBYTES],
-                                uint8_t x,
-                                uint8_t y);
+                                uint8_t x1, uint8_t x2,
+                                uint8_t y1, uint8_t y2);
 
 #define neon_kyber_shake256_prf KYBER_NAMESPACE(_neon_kyber_shake256_prf)
 void neon_kyber_shake256_prf(uint8_t *out1, uint8_t *out2,
@@ -87,14 +87,14 @@ void neon_kyber_shake256_prf(uint8_t *out1, uint8_t *out2,
 
 #define XOF_BLOCKBYTES SHAKE128_RATE
 
-#define neon_kyber_shake128_absorb KYBER_NAMESPACE(_neon_kyber_shake128_absorb)
-void neon_kyber_shake128_absorb(keccakx2_state *state,
-                                const uint8_t seed[KYBER_SYMBYTES],
-                                uint8_t x,
-                                uint8_t y);
-
 #define neon_prf(OUT1, OUT2, OUTBYTES, KEY, NONCE1, NONCE2) \
         neon_kyber_shake256_prf(OUT1, OUT2, OUTBYTES, KEY, NONCE1, NONCE2);
+
+#define neon_xof_absorb(STATE, SEED, X1, X2, Y1, Y2)\
+        neon_kyber_shake128_absorb(STATE, SEED, X1, X2, Y1, Y2)
+
+#define neon_xof_squeezeblocks(OUT0, OUT1, OUTBLOCKS, STATE) \
+        shake128x2_squeezeblocks(OUT0, OUT1, OUTBLOCKS, STATE)
 
 #endif /* KYBER_90S */
 
