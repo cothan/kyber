@@ -174,7 +174,7 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
 
   // Scalar variable
   unsigned int k = 64;
-  unsigned int i, j;
+  unsigned int j;
   // End
 
   // Total possible register: Max 34 = 8+4+8+6+5+1+2, Min = 30
