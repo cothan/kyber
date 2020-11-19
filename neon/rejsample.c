@@ -1,7 +1,7 @@
 #include <arm_neon.h>
 #include "params.h"
 #include "symmetric.h"
-#include <stdio.h>
+#include "rejsample.h"
 
 // Define NEON operation
 // Load 8x16
@@ -36,12 +36,11 @@
 
 // Compare less or equal out = 1 ? a>c : 0
 #define vcompare8(out, a, c) out = vcle_u16(a, c);
-// End 
+// End
 
-#define GEN_MATRIX_NBLOCKS ((12*KYBER_N/8*(1 << 12)/KYBER_Q \
-                             + XOF_BLOCKBYTES)/XOF_BLOCKBYTES)
+#define GEN_MATRIX_NBLOCKS ((12 * KYBER_N / 8 * (1 << 12) / KYBER_Q + XOF_BLOCKBYTES) / XOF_BLOCKBYTES)
 
-#define UPPER_BOUND (GEN_MATRIX_NBLOCKS*XOF_BLOCKBYTES)
+#define UPPER_BOUND (GEN_MATRIX_NBLOCKS * XOF_BLOCKBYTES)
 
 static const uint8_t table_idx[256][16] = {
     {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1}, // 0
@@ -356,7 +355,6 @@ unsigned int rej_uniform(int16_t *r,
         if (ctr < len && val1 < KYBER_Q)
             r[ctr++] = val1;
     }
-    // printf("cref: %d\n", pos);
     return ctr;
 }
 
@@ -388,7 +386,7 @@ unsigned int neon_rej_uniform(int16_t *r, const uint8_t *buf)
     unsigned int reduce_indexes[4], ctr[4];
     unsigned int i, count = 0;
 
-    for (i = 0; i < (UPPER_BOUND/48)*48 && count < KYBER_N - 32; i += 48)
+    for (i = 0; i < (UPPER_BOUND / 48) * 48 && count < KYBER_N - 32; i += 48)
     {
         // 0, 3, 6, 9
         // 1, 4, 7, 10
@@ -451,17 +449,13 @@ unsigned int neon_rej_uniform(int16_t *r, const uint8_t *buf)
 
         vstore(&r[count], (int16x8_t)value.val[0]);
         count += ctr[0];
-        // if (count >= KYBER_N - 8) break;
         vstore(&r[count], (int16x8_t)value.val[1]);
         count += ctr[1];
-        // if (count >= KYBER_N - 8) break;
         vstore(&r[count], (int16x8_t)value.val[2]);
         count += ctr[2];
-        // if (count >= KYBER_N - 8) break;
         vstore(&r[count], (int16x8_t)value.val[3]);
         count += ctr[3];
     }
-    // printf("COUNT %d: %d\n", i, count);
 
     uint8x8x3_t neon_buf8;
     uint16x4x4_t tmp8, value8, sign8;
@@ -540,10 +534,7 @@ unsigned int neon_rej_uniform(int16_t *r, const uint8_t *buf)
         vstore8(&local_buf[local_index], (int16x4_t)value8.val[3]);
         local_index += ctr[3];
 
-        // printf("LOOP %d: %d < %d \n", i, local_index, KYBER_N - count);
-
         i += 24;
-
     } while ((local_index < KYBER_N - count) && (i < UPPER_BOUND));
 
     for (i = 0; i < local_index && count < KYBER_N; i++)
