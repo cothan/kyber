@@ -4,23 +4,11 @@
 #include <stdint.h>
 #include "params.h"
 
-#define zetas KYBER_NAMESPACE(_zetas)
+#define zetas KYBER_NAMESPACE(_ref_zetas)
 extern const int16_t zetas[128];
 
-#define zetas_inv KYBER_NAMESPACE(_zetas_inv)
+#define zetas_inv KYBER_NAMESPACE(_ref_zetas_inv)
 extern const int16_t zetas_inv[128];
-
-#define ntt KYBER_NAMESPACE(_ntt)
-void ntt(int16_t poly[256]);
-
-#define invntt KYBER_NAMESPACE(_invntt)
-void invntt(int16_t poly[256]);
-
-#define basemul KYBER_NAMESPACE(_basemul)
-void basemul(int16_t r[2],
-             const int16_t a[2],
-             const int16_t b[2],
-             int16_t zeta);
 
 #define neon_ntt KYBER_NAMESPACE(_neon_ntt)
 void neon_ntt(int16_t poly[256]);

@@ -16,13 +16,13 @@
 
 typedef aes256ctr_ctx xof_state;
 
-#define kyber_aes256xof_absorb KYBER_NAMESPACE(_kyber_aes256xof_absorb)
+#define kyber_aes256xof_absorb KYBER_NAMESPACE(_ref_kyber_aes256xof_absorb)
 void kyber_aes256xof_absorb(aes256ctr_ctx *state,
                             const uint8_t seed[KYBER_SYMBYTES],
                             uint8_t x,
                             uint8_t y);
 
-#define kyber_aes256ctr_prf KYBER_NAMESPACE(_kyber_aes256ctr_prf)
+#define kyber_aes256ctr_prf KYBER_NAMESPACE(_ref_kyber_aes256ctr_prf)
 void kyber_aes256ctr_prf(uint8_t *out,
                          size_t outlen,
                          const uint8_t key[KYBER_SYMBYTES],
@@ -49,13 +49,13 @@ typedef keccak_state xof_state;
 typedef keccakx2_state neon_xof_state;
 
 
-#define kyber_shake128_absorb KYBER_NAMESPACE(_kyber_shake128_absorb)
+#define kyber_shake128_absorb KYBER_NAMESPACE(_ref_kyber_shake128_absorb)
 void kyber_shake128_absorb(keccak_state *s,
                            const uint8_t seed[KYBER_SYMBYTES],
                            uint8_t x,
                            uint8_t y);
 
-#define kyber_shake256_prf KYBER_NAMESPACE(_kyber_shake256_prf)
+#define kyber_shake256_prf KYBER_NAMESPACE(_ref_kyber_shake256_prf)
 void kyber_shake256_prf(uint8_t *out,
                         size_t outlen,
                         const uint8_t key[KYBER_SYMBYTES],

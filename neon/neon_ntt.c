@@ -35,7 +35,17 @@
 // c = const
 #define vdup(c, const) c = vdup_n_s16(const);
 
-/*
+
+/*************************************************
+* Name:        fqmul
+*
+* Description: Multiplication followed by Montgomery reduction
+*
+* Arguments:   - int16_t a: first factor
+*              - int16_t b: second factor
+*
+* Returns 16-bit integer congruent to a*b*R^{-1} mod q
+
 inout: input/output : int16x4_t
 zeta: input : int16x4_t
 t: temp : int32x4_t
@@ -56,7 +66,7 @@ int16_t fqmul(int16_t b, int16_t c) {
   t >>= 16;
   return t;
 }
-*/
+**************************************************/
 #define fqmul(inout, zeta, t, a, u, neon_qinv, neon_kyberq)                    \
   a = vmull_s16(inout, zeta);                                                  \
   u = vmulq_s32(a, neon_qinv);                                                 \
@@ -97,6 +107,16 @@ int16_t barrett_reduce(int16_t a) {
   vcombine(t, t_lo, t_hi);                                                     \
   inout = vmlaq_s16(inout, t, neon_kyberq16);
 
+/*************************************************
+* Name:        invntt_tomont
+*
+* Description: Inplace inverse number-theoretic transform in Rq and
+*              multiplication by Montgomery factor 2^16.
+*              Input is in bitreversed order, output is in standard order
+*
+* Arguments:   - int16_t r[256]: pointer to input/output vector of elements
+*                                of Zq
+**************************************************/
 void neon_invntt(int16_t r[256]) {
   // NEON Registers
   int16x8_t a, b, c, d, at, bt, ct, dt, neon_zetas, neon_kyberq16;  // 9
@@ -392,6 +412,16 @@ void neon_invntt(int16_t r[256]) {
   }
 }
 
+
+/*************************************************
+* Name:        ntt
+*
+* Description: Inplace number-theoretic transform (NTT) in Rq
+*              input is in standard order, output is in bitreversed order
+*
+* Arguments:   - int16_t r[256]: pointer to input/output vector of elements
+*                                of Zq
+**************************************************/
 void neon_ntt(int16_t r[256]) {
   // NEON Registers
   int16x8_t a, b, c, d, at, bt, ct, dt, neon_zetas;         // 9
