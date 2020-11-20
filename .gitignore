@@ -14,3 +14,9 @@ neon/neon_sample
 neon/.gdb_history
 neon/gen_sample.py
 neon/test_func/neon_sample
+ref/test_speedusec512
+ref/test_speedusec768
+ref/test_speedusec1024
+neon/test_speedusec1024
+neon/test_speedusec768
+neon/test_speedusec512
