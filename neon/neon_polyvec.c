@@ -4,6 +4,14 @@
 #include "ntt.h"
 #include "polyvec.h"
 
+
+/*************************************************
+* Name:        polyvec_ntt
+*
+* Description: Apply forward NTT to all elements of a vector of polynomials
+*
+* Arguments:   - polyvec *r: pointer to in/output vector of polynomials
+**************************************************/
 void neon_polyvec_ntt(polyvec *r)
 {
   unsigned int i;
@@ -14,6 +22,14 @@ void neon_polyvec_ntt(polyvec *r)
   }
 }
 
+/*************************************************
+* Name:        polyvec_invntt_tomont
+*
+* Description: Apply inverse NTT to all elements of a vector of polynomials
+*              and multiply by Montgomery factor 2^16
+*
+* Arguments:   - polyvec *r: pointer to in/output vector of polynomials
+**************************************************/
 void neon_polyvec_invntt_to_mont(polyvec *r)
 {
   unsigned int i;
@@ -21,13 +37,30 @@ void neon_polyvec_invntt_to_mont(polyvec *r)
     neon_invntt(r->vec[i].coeffs);
 }
 
-
-void neon_polyvec_add_reduce(polyvec *c, const polyvec *a) {
+/*************************************************
+* Name:        polyvec_add
+*
+* Description: Add vectors of polynomials
+*
+* Arguments: - polyvec *r:       pointer to output vector of polynomials
+*            - const polyvec *a: pointer to first input vector of polynomials
+*            - const polyvec *b: pointer to second input vector of polynomials
+**************************************************/
+/*************************************************
+* Name:        polyvec_reduce
+*
+* Description: Applies Barrett reduction to each coefficient
+*              of each element of a vector of polynomials
+*              for details of the Barrett reduction see comments in reduce.c
+*
+* Arguments:   - poly *r: pointer to input/output polynomial
+**************************************************/
+void neon_polyvec_add_reduce_csubq(polyvec *c, const polyvec *a) {
   unsigned int i;
   for (i = 0; i < KYBER_K; i++) {
     // c = c + a;
     // c = reduce(c);
-    neon_poly_add_reduce(&c->vec[i], &a->vec[i]);
+    neon_poly_add_reduce_csubq(&c->vec[i], &a->vec[i]);
   }
 }
 
@@ -150,6 +183,16 @@ out2: 1, 5, 9, d | 3, 7, b, f
   out2 = vzip2q_s16(in1, in2);
 
 
+/*************************************************
+* Name:        polyvec_pointwise_acc_montgomery
+*
+* Description: Pointwise multiply elements of a and b, accumulate into r,
+*              and multiply by 2^-16.
+*
+* Arguments: - poly *r:          pointer to output polynomial
+*            - const polyvec *a: pointer to first input vector of polynomials
+*            - const polyvec *b: pointer to second input vector of polynomials
+**************************************************/
 void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, const int to_mont) {
 
   int16x8x2_t aa, bb, sum, cc;                                           //8
