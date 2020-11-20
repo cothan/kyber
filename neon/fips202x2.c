@@ -351,6 +351,7 @@ void KeccakF1600_StatePermutex2(v128 state[25])
 *              - uint8_t p: domain-separation byte for different
 *                           Keccak-derived functions
 **************************************************/
+static
 void keccakx2_absorb(v128 s[25],
                      unsigned int r,
                      const uint8_t *in0,
@@ -462,6 +463,7 @@ void keccakx2_absorb(v128 s[25],
 *              - unsigned int r: rate in bytes (e.g., 168 for SHAKE128)
 *              - uint64_t *s: pointer to input/output Keccak state
 **************************************************/
+static 
 void keccakx2_squeezeblocks(uint8_t *out0,
                             uint8_t *out1,
                             size_t nblocks,
@@ -659,62 +661,4 @@ void shake256x2(uint8_t *out0,
       out1[i] = t[1][i];
     }
   }
-}
-
-/*************************************************
-* Name:        sha3_256x2
-*
-* Description: SHA3-256 with non-incremental API
-*
-* Arguments:   - uint8_t *h:        pointer to output (32 bytes)
-*              - const uint8_t *in: pointer to input
-*              - size_t inlen:      length of input in bytes
-**************************************************/
-void sha3_256x2(uint8_t h1[32],
-                uint8_t h2[32],
-                const uint8_t *in1,
-                const uint8_t *in2,
-                size_t inlen)
-{
-  v128 s[25];
-  uint8_t t1[SHA3_256_RATE];
-  uint8_t t2[SHA3_256_RATE];
-
-  keccakx2_absorb(s, SHA3_256_RATE, in1, in2, inlen, 0x06);
-  keccakx2_squeezeblocks(t1, t2, 1, SHA3_256_RATE, s);
-
-  uint8x16x2_t a, b;
-  a = vld1q_u8_x2(t1);
-  b = vld1q_u8_x2(t2);
-  vst1q_u8_x2(h1, a);
-  vst1q_u8_x2(h2, b);
-}
-
-/*************************************************
-* Name:        sha3_512x2
-*
-* Description: SHA3-512 with non-incremental API
-*
-* Arguments:   - uint8_t *h:        pointer to output (64 bytes)
-*              - const uint8_t *in: pointer to input
-*              - size_t inlen:      length of input in bytes
-**************************************************/
-void sha3_512x2(uint8_t h1[64],
-                uint8_t h2[64],
-                const uint8_t *in1,
-                const uint8_t *in2,
-                size_t inlen)
-{
-  v128 s[25];
-  uint8_t t1[SHA3_512_RATE];
-  uint8_t t2[SHA3_512_RATE];
-
-  keccakx2_absorb(s, SHA3_512_RATE, in1, in2, inlen, 0x06);
-  keccakx2_squeezeblocks(t1, t2, 1, SHA3_512_RATE, s);
-
-  uint8x16x4_t a, b;
-  a = vld1q_u8_x4(t1);
-  b = vld1q_u8_x4(t2);
-  vst1q_u8_x4(h1, a);
-  vst1q_u8_x4(h2, b);
 }
