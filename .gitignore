@@ -4,3 +4,13 @@ tvecs512
 tvecs512-90s
 tvecs768
 tvecs768-90s
+*.req
+*.rsp
+*.out.*
+*.json
+neon/params.h
+neon/neon_cbd
+neon/neon_sample
+neon/.gdb_history
+neon/gen_sample.py
+neon/test_func/neon_sample

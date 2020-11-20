@@ -111,7 +111,7 @@ static void pack_ciphertext(uint8_t r[KYBER_INDCPA_BYTES],
 **************************************************/
 static void unpack_ciphertext(polyvec *b,
                               poly *v,
-                              const uint8_t c[KYBER_INDCPA_BYTES])
+                              const uint8_t c[KYBER_INDCPA_BYTES+6])
 {
   polyvec_decompress(b, c);
   poly_decompress(v, c+KYBER_POLYVECCOMPRESSEDBYTES);
@@ -138,17 +138,18 @@ static unsigned int rej_uniform(int16_t *r,
                                 unsigned int buflen)
 {
   unsigned int ctr, pos;
-  uint16_t val;
+  uint16_t val0, val1;
 
   ctr = pos = 0;
-  while(ctr < len && pos + 2 <= buflen) {
-    val = buf[pos] | ((uint16_t)buf[pos+1] << 8);
-    pos += 2;
+  while(ctr < len && pos + 3 <= buflen) {
+    val0 = ((buf[pos+0] >> 0) | ((uint16_t)buf[pos+1] << 8)) & 0xFFF;
+    val1 = ((buf[pos+1] >> 4) | ((uint16_t)buf[pos+2] << 4));
+    pos += 3;
 
-    if(val < 19*KYBER_Q) {
-      val -= ((uint32_t)val*20159 >> 26)*KYBER_Q; // Barrett reduction
-      r[ctr++] = (int16_t)val;
-    }
+    if(val0 < KYBER_Q)
+      r[ctr++] = val0;
+    if(ctr < len && val1 < KYBER_Q)
+      r[ctr++] = val1;
   }
 
   return ctr;
@@ -169,16 +170,17 @@ static unsigned int rej_uniform(int16_t *r,
 *              - const uint8_t *seed: pointer to input seed
 *              - int transposed: boolean deciding whether A or A^T is generated
 **************************************************/
-#define GEN_MATRIX_NBLOCKS ((2*KYBER_N*(1U << 16)/(19*KYBER_Q) \
-                             + XOF_BLOCKBYTES)/XOF_BLOCKBYTES)
+#define GEN_MATRIX_NBLOCKS (AVX_REJ_UNIFORM_BUFLEN/XOF_BLOCKBYTES)
+
 #ifdef KYBER_90S
 void gen_matrix(polyvec *a, const uint8_t seed[KYBER_SYMBYTES], int transposed)
 {
-  unsigned int ctr, i, j;
+  unsigned int ctr, i, j, k;
+  unsigned buflen, off;
   __attribute__((aligned(16)))
   uint64_t nonce;
   __attribute__((aligned(32)))
-  uint8_t buf[GEN_MATRIX_NBLOCKS*XOF_BLOCKBYTES];
+  uint8_t buf[AVX_REJ_UNIFORM_BUFLEN+2];
   aes256ctr_ctx state;
 
   aes256ctr_init(&state, seed, 0);
@@ -192,12 +194,16 @@ void gen_matrix(polyvec *a, const uint8_t seed[KYBER_SYMBYTES], int transposed)
 
       state.n = _mm_loadl_epi64((__m128i *)&nonce);
       aes256ctr_squeezeblocks(buf, GEN_MATRIX_NBLOCKS, &state);
+      buflen = GEN_MATRIX_NBLOCKS*XOF_BLOCKBYTES;
       ctr = rej_uniform_avx(a[i].vec[j].coeffs, buf);
 
       while(ctr < KYBER_N) {
-        aes256ctr_squeezeblocks(buf, 1, &state);
-        ctr += rej_uniform(a[i].vec[j].coeffs + ctr, KYBER_N - ctr, buf,
-                           XOF_BLOCKBYTES);
+        off = buflen % 3;
+        for(k = 0; k < off; k++)
+          buf[k] = buf[buflen - off + k];
+        aes256ctr_squeezeblocks(buf + off, 1, &state);
+        buflen = off + XOF_BLOCKBYTES;
+        ctr += rej_uniform(a[i].vec[j].coeffs + ctr, KYBER_N - ctr, buf, buflen);
       }
 
       poly_nttunpack(&a[i].vec[j]);
@@ -210,7 +216,7 @@ void gen_matrix(polyvec *a, const uint8_t seed[32], int transposed)
 {
   unsigned int ctr0, ctr1, ctr2, ctr3;
   __attribute__((aligned(32)))
-  uint8_t buf[4][(GEN_MATRIX_NBLOCKS*XOF_BLOCKBYTES+31)/32*32];
+  uint8_t buf[4][AVX_REJ_UNIFORM_BUFLEN];
   __m256i f;
   keccakx4_state state;
 
@@ -497,42 +503,52 @@ void indcpa_keypair(uint8_t pk[KYBER_INDCPA_PUBLICKEYBYTES],
   gen_a(a, publicseed);
 
 #ifdef KYBER_90S
+#define NBLOCKS ((2*KYBER_ETA1*32)/AES256CTR_BLOCKBYTES ) /* Assumes divisibility */
   __attribute__((aligned(16)))
   uint64_t nonce = 0;
   aes256ctr_ctx state;
   __attribute__((aligned(32)))
-  uint8_t coins[128];
+  uint8_t coins[AES256CTR_BLOCKBYTES*NBLOCKS+2]; /* +2 as required by cbd3 */
   aes256ctr_init(&state, noiseseed, nonce++);
   for(i=0;i<KYBER_K;i++) {
-    aes256ctr_squeezeblocks(coins, 2, &state);
+    aes256ctr_squeezeblocks(coins, NBLOCKS, &state);
     state.n = _mm_loadl_epi64((__m128i *)&nonce);
     nonce++;
-    cbd(&skpv.vec[i], coins);
+    cbd_eta1(&skpv.vec[i], coins);
   }
   for(i=0;i<KYBER_K;i++) {
-    aes256ctr_squeezeblocks(coins, 2, &state);
+    aes256ctr_squeezeblocks(coins, NBLOCKS, &state);
     state.n = _mm_loadl_epi64((__m128i *)&nonce);
     nonce++;
-    cbd(&e.vec[i], coins);
+    cbd_eta1(&e.vec[i], coins);
   }
 #else
 #if KYBER_K == 2
-  poly_getnoise4x(skpv.vec+0, skpv.vec+1, e.vec+0, e.vec+1, noiseseed,
-                  0, 1, 2, 3);
+  poly_getnoise_eta1_4x(skpv.vec+0, skpv.vec+1, e.vec+0, e.vec+1, noiseseed,
+      0, 1, 2, 3);
 #elif KYBER_K == 3
-  poly_getnoise4x(skpv.vec+0, skpv.vec+1, skpv.vec+2, e.vec+0, noiseseed,
+#if KYBER_ETA1 == KYBER_ETA2
+  poly_getnoise_eta2_4x(skpv.vec+0, skpv.vec+1, skpv.vec+2, e.vec+0, noiseseed,
                   0, 1, 2, 3);
-  poly_getnoise4x(e.vec+1, e.vec+2, pkpv.vec+0, pkpv.vec+1, noiseseed,
+  poly_getnoise_eta2_4x(e.vec+1, e.vec+2, pkpv.vec+0, pkpv.vec+1, noiseseed,
                   4, 5, 6, 7);
+#else
+#error "We need eta1 == eta2 here"
+#endif
 #elif KYBER_K == 4
-  poly_getnoise4x(skpv.vec+0, skpv.vec+1, skpv.vec+2, skpv.vec+3, noiseseed,
+#if KYBER_ETA1 == KYBER_ETA2
+  poly_getnoise_eta2_4x(skpv.vec+0, skpv.vec+1, skpv.vec+2, skpv.vec+3, noiseseed,
                   0, 1, 2, 3);
-  poly_getnoise4x(e.vec+0, e.vec+1, e.vec+2, e.vec+3, noiseseed,
+  poly_getnoise_eta2_4x(e.vec+0, e.vec+1, e.vec+2, e.vec+3, noiseseed,
                   4, 5, 6, 7);
+#else
+#error "We need eta1 == eta2 here"
+#endif
 #endif
 #endif
 
   polyvec_ntt(&skpv);
+  polyvec_reduce(&skpv);
   polyvec_ntt(&e);
 
   // matrix-vector multiplication
@@ -581,44 +597,52 @@ void indcpa_enc(uint8_t c[KYBER_INDCPA_BYTES],
   gen_at(at, seed);
 
 #ifdef KYBER_90S
+#define NBLOCKS ((2*KYBER_ETA1*32)/AES256CTR_BLOCKBYTES ) /* Assumes divisibility */
   __attribute__((aligned(16)))
   uint64_t nonce = 0;
   aes256ctr_ctx state;
   __attribute__((aligned(32)))
-  uint8_t buf[128];
+  uint8_t buf[AES256CTR_BLOCKBYTES*NBLOCKS+2]; /* +2 as required by cbd3 */
   aes256ctr_init(&state, coins, nonce++);
   for(i=0;i<KYBER_K;i++) {
-    aes256ctr_squeezeblocks(buf, 2, &state);
+    aes256ctr_squeezeblocks(buf, NBLOCKS, &state);
     state.n = _mm_loadl_epi64((__m128i *)&nonce);
     nonce++;
-    cbd(&sp.vec[i], buf);
+    cbd_eta1(&sp.vec[i], buf);
   }
   for(i=0;i<KYBER_K;i++) {
     aes256ctr_squeezeblocks(buf, 2, &state);
     state.n = _mm_loadl_epi64((__m128i *)&nonce);
     nonce++;
-    cbd(&ep.vec[i], buf);
+    cbd_eta2(&ep.vec[i], buf);
   }
   aes256ctr_squeezeblocks(buf, 2, &state);
   state.n = _mm_loadl_epi64((__m128i *)&nonce);
   nonce++;
-  cbd(&epp, buf);
+  cbd_eta2(&epp, buf);
 #else
 #if KYBER_K == 2
-  poly_getnoise4x(sp.vec+0, sp.vec+1, ep.vec+0, ep.vec+1, coins,
-                  0, 1, 2, 3);
-  poly_getnoise(&epp, coins, 4);
+  poly_getnoise_eta1122_4x(sp.vec+0, sp.vec+1, ep.vec+0, ep.vec+1, coins, 0, 1, 2, 3);
+  poly_getnoise_eta2(&epp, coins, 4);
 #elif KYBER_K == 3
-  poly_getnoise4x(sp.vec+0, sp.vec+1, sp.vec+2, ep.vec+0, coins,
+#if KYBER_ETA1 == KYBER_ETA2
+  poly_getnoise_eta2_4x(sp.vec+0, sp.vec+1, sp.vec+2, ep.vec+0, coins,
                   0, 1, 2 ,3);
-  poly_getnoise4x(ep.vec+1, ep.vec+2, &epp, bp.vec+0, coins,
+  poly_getnoise_eta2_4x(ep.vec+1, ep.vec+2, &epp, bp.vec+0, coins,
                   4, 5, 6, 7);
+#else
+#error "We need eta1 == eta2 here"
+#endif
 #elif KYBER_K == 4
-  poly_getnoise4x(sp.vec+0, sp.vec+1, sp.vec+2, sp.vec+3, coins,
+#if KYBER_ETA1 == KYBER_ETA2
+  poly_getnoise_eta2_4x(sp.vec+0, sp.vec+1, sp.vec+2, sp.vec+3, coins,
                   0, 1, 2, 3);
-  poly_getnoise4x(ep.vec+0, ep.vec+1, ep.vec+2, ep.vec+3, coins,
+  poly_getnoise_eta2_4x(ep.vec+0, ep.vec+1, ep.vec+2, ep.vec+3, coins,
                   4, 5, 6, 7);
-  poly_getnoise(&epp, coins, 8);
+  poly_getnoise_eta2(&epp, coins, 8);
+#else
+#error "We need eta1 == eta2 here"
+#endif
 #endif
 #endif
 
@@ -627,7 +651,6 @@ void indcpa_enc(uint8_t c[KYBER_INDCPA_BYTES],
   // matrix-vector multiplication
   for(i=0;i<KYBER_K;i++)
     polyvec_pointwise_acc_montgomery(&bp.vec[i], &at[i], &sp);
-
   polyvec_pointwise_acc_montgomery(&v, &pkpv, &sp);
 
   polyvec_invntt_tomont(&bp);

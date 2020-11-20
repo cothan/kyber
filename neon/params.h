@@ -2,7 +2,7 @@
 #define PARAMS_H
 
 #ifndef KYBER_K
-#define KYBER_K 3	/* Change this for different security strengths */
+#define KYBER_K 2	/* Change this for different security strengths */
 #endif
 
 //#define KYBER_90S	/* Uncomment this if you want the 90S variant */
@@ -10,21 +10,21 @@
 /* Don't change parameters below this line */
 #if   (KYBER_K == 2)
 #ifdef KYBER_90S
-#define KYBER_NAMESPACE(s) pqcrystals_kyber512_90s_ref##s
+#define KYBER_NAMESPACE(s) pqcrystals_kyber512_90s##s
 #else
-#define KYBER_NAMESPACE(s) pqcrystals_kyber512_ref##s
+#define KYBER_NAMESPACE(s) pqcrystals_kyber512##s
 #endif
 #elif (KYBER_K == 3)
 #ifdef KYBER_90S
-#define KYBER_NAMESPACE(s) pqcrystals_kyber768_90s_ref##s
+#define KYBER_NAMESPACE(s) pqcrystals_kyber768_90s##s
 #else
-#define KYBER_NAMESPACE(s) pqcrystals_kyber768_ref##s
+#define KYBER_NAMESPACE(s) pqcrystals_kyber768##s
 #endif
 #elif (KYBER_K == 4)
 #ifdef KYBER_90S
-#define KYBER_NAMESPACE(s) pqcrystals_kyber1024_90s_ref##s
+#define KYBER_NAMESPACE(s) pqcrystals_kyber1024_90s##s
 #else
-#define KYBER_NAMESPACE(s) pqcrystals_kyber1024_ref##s
+#define KYBER_NAMESPACE(s) pqcrystals_kyber1024##s
 #endif
 #else
 #error "KYBER_K must be in {2,3,4}"
@@ -33,7 +33,6 @@
 #define KYBER_N 256
 #define KYBER_Q 3329
 
-#define KYBER_ETA 2
 
 #define KYBER_SYMBYTES 32   /* size in bytes of hashes, and seeds */
 #define KYBER_SSBYTES  32   /* size in bytes of shared key */
@@ -42,15 +41,20 @@
 #define KYBER_POLYVECBYTES	(KYBER_K * KYBER_POLYBYTES)
 
 #if KYBER_K == 2
-#define KYBER_POLYCOMPRESSEDBYTES    96
+#define KYBER_ETA1 3
+#define KYBER_POLYCOMPRESSEDBYTES    128
 #define KYBER_POLYVECCOMPRESSEDBYTES (KYBER_K * 320)
 #elif KYBER_K == 3
+#define KYBER_ETA1 2
 #define KYBER_POLYCOMPRESSEDBYTES    128
 #define KYBER_POLYVECCOMPRESSEDBYTES (KYBER_K * 320)
 #elif KYBER_K == 4
+#define KYBER_ETA1 2
 #define KYBER_POLYCOMPRESSEDBYTES    160
 #define KYBER_POLYVECCOMPRESSEDBYTES (KYBER_K * 352)
 #endif
+
+#define KYBER_ETA2 2
 
 #define KYBER_INDCPA_MSGBYTES       KYBER_SYMBYTES
 #define KYBER_INDCPA_PUBLICKEYBYTES (KYBER_POLYVECBYTES + KYBER_SYMBYTES)

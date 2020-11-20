@@ -3,6 +3,14 @@
 
 #include <stdint.h>
 
+
+#if __aarch64__
+#include <papi.h>
+
+#define cpucycles PAPI_get_real_cyc
+
+#else
+
 #ifdef USE_RDPMC  /* Needs echo 2 > /sys/devices/cpu/rdpmc */
 
 static inline uint64_t cpucycles(void) {
@@ -30,4 +38,5 @@ static inline uint64_t cpucycles(void) {
 
 uint64_t cpucycles_overhead(void);
 
+#endif
 #endif

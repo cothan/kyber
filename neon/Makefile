@@ -1,18 +1,18 @@
 CC ?= /usr/bin/cc
 CFLAGS += -Wall -Wextra -Wpedantic -Wmissing-prototypes -Wredundant-decls \
-  -Wshadow -Wpointer-arith -O3
+  -Wshadow -Wpointer-arith -O3 -march=native -fomit-frame-pointer -lpapi
 NISTFLAGS += -Wno-unused-result -O3
 RM = /bin/rm
 
-SOURCES = kem.c indcpa.c polyvec.c poly.c reduce.c ntt.c cbd.c verify.c
-SOURCESKECCAK = $(SOURCES) fips202.c symmetric-shake.c
+SOURCES = kem.c indcpa.c cbd.c neon_symmetric-shake.c neon_polyvec.c neon_poly.c polyvec.c poly.c reduce.c neon_ntt.c ntt.c verify.c
+SOURCESKECCAK = $(SOURCES) fips202x2.c fips202.c symmetric-shake.c rejsample.c
 SOURCESNINETIES = $(SOURCES) sha256.c sha512.c aes256ctr.c symmetric-aes.c
 HEADERS = params.h api.h indcpa.h polyvec.h poly.h reduce.h ntt.h cbd.h \
-  verify.h symmetric.h randombytes.h
-HEADERSKECCAK = $(HEADERS) fips202.h
+  verify.h symmetric.h randombytes.h fips202x2.h rejsample.h
+HEADERSKECCAK = $(HEADERS) fips202.h fips202x2.h
 HEADERSNINETIES = $(HEADERS) aes256ctr.h sha2.h
 
-.PHONY: all speed shared clean
+.PHONY: all shared clean
 
 all: \
   test_kyber512 \
@@ -24,6 +24,9 @@ all: \
   test_vectors512 \
   test_vectors768 \
   test_vectors1024 \
+  test_speed512 \
+  test_speed768 \
+  test_speed1024 \
   test_kyber512-90s \
   test_kyber768-90s \
   test_kyber1024-90s \
@@ -33,40 +36,35 @@ all: \
   test_vectors512-90s \
   test_vectors768-90s \
   test_vectors1024-90s \
-  PQCgenKAT_kem
-
-speed: \
-  test_speed512 \
-  test_speed768 \
-  test_speed1024 \
   test_speed512-90s \
   test_speed768-90s \
-  test_speed1024-90s
+  test_speed1024-90s \
+  PQCgenKAT_kem
 
 shared: \
-  libpqcrystals_kyber512_ref.so \
-  libpqcrystals_kyber768_ref.so \
-  libpqcrystals_kyber1024_ref.so \
-  libpqcrystals_kyber512-90s_ref.so \
-  libpqcrystals_kyber768-90s_ref.so \
-  libpqcrystals_kyber1024-90s_ref.so \
-  libpqcrystals_fips202_ref.so \
-  libpqcrystals_sha2_ref.so
+  libpqcrystals_kyber512_neon.so \
+  libpqcrystals_kyber768_neon.so \
+  libpqcrystals_kyber1024_neon.so \
+  libpqcrystals_kyber512-90s_neon.so \
+  libpqcrystals_kyber768-90s_neon.so \
+  libpqcrystals_kyber1024-90s_neon.so \
+  libpqcrystals_fips202_neon.so \
+  libpqcrystals_sha2_neon.so
 
-libpqcrystals_fips202_ref.so: fips202.c fips202.h
-	$(CC) -shared -fPIC $(CFLAGS) fips202.c -o libpqcrystals_fips202_ref.so
+libpqcrystals_fips202_neon.so: fips202.c fips202.h
+	$(CC) -shared -fPIC $(CFLAGS) fips202.c -o libpqcrystals_fips202_neon.so
 
-libpqcrystals_sha2_ref.so: sha256.c sha512.c sha2.h
-	$(CC) -shared -fPIC $(CFLAGS) sha256.c sha512.c -o libpqcrystals_sha2_ref.so
+libpqcrystals_sha2_neon.so: sha256.c sha512.c sha2.h
+	$(CC) -shared -fPIC $(CFLAGS) sha256.c sha512.c -o libpqcrystals_sha2_neon.so
 
-libpqcrystals_kyber512_ref.so: $(SOURCES) $(HEADERS) symmetric-shake.c
-	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=2 $(SOURCES) symmetric-shake.c -o libpqcrystals_kyber512_ref.so
+libpqcrystals_kyber512_neon.so: $(SOURCES) $(HEADERS) symmetric-shake.c
+	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=2 $(SOURCES) symmetric-shake.c -o libpqcrystals_kyber512_neon.so
 
-libpqcrystals_kyber768_ref.so: $(SOURCES) $(HEADERS) symmetric-shake.c
-	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=3 $(SOURCES) symmetric-shake.c -o libpqcrystals_kyber768_ref.so
+libpqcrystals_kyber768_neon.so: $(SOURCES) $(HEADERS) symmetric-shake.c
+	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=3 $(SOURCES) symmetric-shake.c -o libpqcrystals_kyber768_neon.so
 
-libpqcrystals_kyber1024_ref.so: $(SOURCES) $(HEADERS) symmetric-shake.c
-	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=4 $(SOURCES) symmetric-shake.c -o libpqcrystals_kyber1024_ref.so
+libpqcrystals_kyber1024_neon.so: $(SOURCES) $(HEADERS) symmetric-shake.c
+	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=4 $(SOURCES) symmetric-shake.c -o libpqcrystals_kyber1024_neon.so
 
 test_kyber512: $(SOURCESKECCAK) $(HEADERSKECCAK) test_kyber.c randombytes.c
 	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c test_kyber.c -o test_kyber512
@@ -104,14 +102,14 @@ test_speed768: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c speed_p
 test_speed1024: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed.c randombytes.c kex.c kex.h
 	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c cpucycles.c speed_print.c kex.c test_speed.c -o test_speed1024
 
-libpqcrystals_kyber512-90s_ref.so: $(SOURCES) $(HEADERS) symmetric-aes.c
-	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=2 -DKYBER_90S $(SOURCES) symmetric-aes.c -o libpqcrystals_kyber512-90s_ref.so
+libpqcrystals_kyber512-90s_neon.so: $(SOURCES) $(HEADERS) symmetric-aes.c
+	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=2 -DKYBER_90S $(SOURCES) symmetric-aes.c -o libpqcrystals_kyber512-90s_neon.so
 
-libpqcrystals_kyber768-90s_ref.so: $(SOURCES) $(HEADERS) symmetric-aes.c
-	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=3 -DKYBER_90S $(SOURCES) symmetric-aes.c -o libpqcrystals_kyber768-90s_ref.so
+libpqcrystals_kyber768-90s_neon.so: $(SOURCES) $(HEADERS) symmetric-aes.c
+	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=3 -DKYBER_90S $(SOURCES) symmetric-aes.c -o libpqcrystals_kyber768-90s_neon.so
 
-libpqcrystals_kyber1024-90s_ref.so: $(SOURCES) $(HEADERS) symmetric-aes.c
-	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=4 -DKYBER_90S $(SOURCES) symmetric-aes.c -o libpqcrystals_kyber1024-90s_ref.so
+libpqcrystals_kyber1024-90s_neon.so: $(SOURCES) $(HEADERS) symmetric-aes.c
+	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=4 -DKYBER_90S $(SOURCES) symmetric-aes.c -o libpqcrystals_kyber1024-90s_neon.so
 
 test_kyber512-90s: $(SOURCESNINETIES) $(HEADERSNINETIES) test_kyber.c randombytes.c
 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=2 $(SOURCESNINETIES) randombytes.c test_kyber.c -o test_kyber512-90s
