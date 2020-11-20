@@ -8,6 +8,7 @@
 #include <papi.h>
 
 #define cpucycles PAPI_get_real_cyc
+#define cpucusec PAPI_get_real_usec
 
 #else
 

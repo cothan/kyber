@@ -27,6 +27,9 @@ all: \
   test_speed512 \
   test_speed768 \
   test_speed1024 \
+  test_speedusec512 \
+  test_speedusec768 \
+  test_speedusec1024 \
   test_kyber512-90s \
   test_kyber768-90s \
   test_kyber1024-90s \
@@ -40,6 +43,11 @@ all: \
   test_speed768-90s \
   test_speed1024-90s \
   PQCgenKAT_kem
+
+speed: \
+  test_speedusec512 \
+  test_speedusec768 \
+  test_speedusec1024
 
 shared: \
   libpqcrystals_kyber512_ref.so \
@@ -101,6 +109,15 @@ test_speed768: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c speed_p
 
 test_speed1024: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed.c randombytes.c kex.c kex.h
 	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c cpucycles.c speed_print.c kex.c test_speed.c -o test_speed1024
+
+test_speedusec512: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed_usec.c randombytes.c kex.c kex.h
+	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c cpucycles.c speed_print.c kex.c test_speed_usec.c -o test_speedusec512
+
+test_speedusec768: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed_usec.c randombytes.c kex.c kex.h
+	$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) randombytes.c cpucycles.c speed_print.c kex.c test_speed_usec.c -o test_speedusec768
+
+test_speedusec1024: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed_usec.c randombytes.c kex.c kex.h
+	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c cpucycles.c speed_print.c kex.c test_speed_usec.c -o test_speedusec1024
 
 libpqcrystals_kyber512-90s_ref.so: $(SOURCES) $(HEADERS) symmetric-aes.c
 	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=2 -DKYBER_90S $(SOURCES) symmetric-aes.c -o libpqcrystals_kyber512-90s_ref.so
@@ -177,3 +194,11 @@ clean:
 	-$(RM) -rf test_speed768-90s
 	-$(RM) -rf test_speed1024-90s
 	-$(RM) -rf PQCgenKAT_kem
+	-$(RM) -rf test_speedusec512
+	-$(RM) -rf test_speedusec768
+	-$(RM) -rf test_speedusec1024
+
+bench: 
+	./test_speedusec512
+	./test_speedusec768
+	./test_speedusec1024
