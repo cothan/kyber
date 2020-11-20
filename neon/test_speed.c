@@ -28,7 +28,7 @@ int main()
   unsigned char kexsendb[KEX_AKE_SENDBBYTES] = {0};
   unsigned char kexkey[KEX_SSBYTES] = {0};
   polyvec matrix[KYBER_K];
-  poly ap;
+  poly ap, bp;
 
   for(i=0;i<NTESTS;i++) {
     t[i] = cpucycles();
@@ -38,15 +38,16 @@ int main()
 
   for(i=0;i<NTESTS;i++) {
     t[i] = cpucycles();
-    poly_getnoise_eta1(&ap, seed, 0);
+    neon_poly_getnoise_eta1_2x(&ap, &bp, seed, 0, 1);
   }
-  print_results("poly_getnoise_eta1: ", t, NTESTS);
+  print_results("neon_poly_getnoise_eta1_2x/2: ", t, NTESTS);
 
   for(i=0;i<NTESTS;i++) {
     t[i] = cpucycles();
-    poly_getnoise_eta2(&ap, seed, 0);
+    neon_poly_getnoise_eta2(&ap, seed, 0);
   }
-  print_results("poly_getnoise_eta2: ", t, NTESTS);
+  print_results("neon_poly_getnoise_eta2: ", t, NTESTS);
+
 
   for(i=0;i<NTESTS;i++) {
     t[i] = cpucycles();
