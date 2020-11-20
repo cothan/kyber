@@ -27,6 +27,7 @@ int main()
   unsigned char kexsenda[KEX_AKE_SENDABYTES] = {0};
   unsigned char kexsendb[KEX_AKE_SENDBBYTES] = {0};
   unsigned char kexkey[KEX_SSBYTES] = {0};
+  unsigned char msg[KYBER_INDCPA_MSGBYTES] = {0};
   polyvec matrix[KYBER_K];
   poly ap, bp;
 
@@ -47,6 +48,18 @@ int main()
     neon_poly_getnoise_eta2(&ap, seed, 0);
   }
   print_results("neon_poly_getnoise_eta2: ", t, NTESTS);
+
+  for(i=0;i<NTESTS;i++) {
+    t[i] = cpucycles();
+    poly_tomsg(msg, &ap);
+  }
+  print_results("poly_tomsg: ", t, NTESTS);
+
+  for(i=0;i<NTESTS;i++) {
+    t[i] = cpucycles();
+    poly_frommsg(&ap, msg);
+  }
+  print_results("poly_frommsg: ", t, NTESTS);
 
 
   for(i=0;i<NTESTS;i++) {
