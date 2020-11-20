@@ -11,3 +11,6 @@ tvecs768-90s
 neon/params.h
 neon/neon_cbd
 neon/neon_sample
+neon/.gdb_history
+neon/gen_sample.py
+neon/test_func/neon_sample
