@@ -2,7 +2,7 @@
 #define PARAMS_H
 
 #ifndef KYBER_K
-#define KYBER_K 3	/* Change this for different security strengths */
+#define KYBER_K 2	/* Change this for different security strengths */
 #endif
 
 //#define KYBER_90S	/* Uncomment this if you want the 90S variant */
@@ -10,21 +10,21 @@
 /* Don't change parameters below this line */
 #if   (KYBER_K == 2)
 #ifdef KYBER_90S
-#define KYBER_NAMESPACE(s) pqcrystals_kyber512_90s_neon##s
+#define KYBER_NAMESPACE(s) pqcrystals_kyber512_90s##s
 #else
-#define KYBER_NAMESPACE(s) pqcrystals_kyber512_neon##s
+#define KYBER_NAMESPACE(s) pqcrystals_kyber512##s
 #endif
 #elif (KYBER_K == 3)
 #ifdef KYBER_90S
-#define KYBER_NAMESPACE(s) pqcrystals_kyber768_90s_neon##s
+#define KYBER_NAMESPACE(s) pqcrystals_kyber768_90s##s
 #else
-#define KYBER_NAMESPACE(s) pqcrystals_kyber768_neon##s
+#define KYBER_NAMESPACE(s) pqcrystals_kyber768##s
 #endif
 #elif (KYBER_K == 4)
 #ifdef KYBER_90S
-#define KYBER_NAMESPACE(s) pqcrystals_kyber1024_90s_neon##s
+#define KYBER_NAMESPACE(s) pqcrystals_kyber1024_90s##s
 #else
-#define KYBER_NAMESPACE(s) pqcrystals_kyber1024_neon##s
+#define KYBER_NAMESPACE(s) pqcrystals_kyber1024##s
 #endif
 #else
 #error "KYBER_K must be in {2,3,4}"
