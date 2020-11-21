@@ -173,23 +173,6 @@ void neon_cbd2(poly *r, const uint8_t buf[2 * KYBER_N / 4])
         vand(b, b, const_0x3);
         vsub(c[7], (int32x4_t)a, (int32x4_t)b);
 
-        // c[0]: x | 24 | x | 16 -- x | 8  | x | 0
-        // c[1]: x | 25 | x | 17 -- x | 9  | x | 1
-        // c[2]: x | 26 | x | 18 -- x | 10 | x | 2
-        // c[3]: x | 27 | x | 19 -- x | 11 | x | 3
-        // c[4]: x | 28 | x | 20 -- x | 12 | x | 4
-        // c[5]: x | 29 | x | 21 -- x | 13 | x | 5
-        // c[6]: x | 30 | x | 22 -- x | 14 | x | 6
-        // c[7]: x | 31 | x | 23 -- x | 15 | x | 7
-        // Transpose
-        // c[0]: x | x | x | x -- x | x | x | x
-        // c[1]: 24 ... 31
-        // c[2]: x | x | x | x -- x | x | x | x
-        // c[3]: 16 ... 23
-        // c[4]: x | x | x | x -- x | x | x | x
-        // c[5]: 8  ... 15
-        // c[6]: x | x | x | x -- x | x | x | x
-        // c[7]: 0  ... 7
         transpose8x8(out_c, c);
 
         vstore(&r->coeffs[j], out_c);
