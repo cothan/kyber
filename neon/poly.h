@@ -20,8 +20,6 @@ void poly_decompress(poly *r, const uint8_t a[KYBER_POLYCOMPRESSEDBYTES]);
 #define poly_tobytes KYBER_NAMESPACE(_ref_poly_tobytes)
 void poly_tobytes(uint8_t r[KYBER_POLYBYTES], poly *a, 
                   const uint8_t reduce);
-#define poly_frombytes KYBER_NAMESPACE(_ref_poly_frombytes)
-void poly_frombytes(poly *r, const uint8_t a[KYBER_POLYBYTES]);
 
 #define poly_frommsg KYBER_NAMESPACE(_ref_poly_frommsg)
 void poly_frommsg(poly *r, const uint8_t msg[KYBER_INDCPA_MSGBYTES]);
@@ -58,6 +56,9 @@ void neon_poly_getnoise_eta2(poly *r,
 
 #define poly_csubq KYBER_NAMESPACE(_neon_poly_csubq)
 void poly_csubq(poly *r);
+
+#define poly_frombytes KYBER_NAMESPACE(_neon_poly_frombytes)
+void poly_frombytes(poly *r, const uint8_t a[KYBER_POLYBYTES]);
 
 #endif
 
