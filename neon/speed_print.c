@@ -60,7 +60,7 @@ void print_results_usec(const char *s, uint64_t *t, size_t tlen) {
   }
 
   if(overhead  == (uint64_t)-1)
-    overhead = cpucycles_overhead();
+    overhead = cpucusec_overhead();
 
   tlen--;
   for(i=0;i<tlen;++i)

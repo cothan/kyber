@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include "cpucycles.h"
 
+extern inline
 uint64_t cpucycles_overhead(void) {
   uint64_t t0, t1, overhead = -1LL;
   unsigned int i;
@@ -9,6 +10,22 @@ uint64_t cpucycles_overhead(void) {
     t0 = cpucycles();
     __asm__ volatile ("");
     t1 = cpucycles();
+    if(t1 - t0 < overhead)
+      overhead = t1 - t0;
+  }
+
+  return overhead;
+}
+
+extern inline
+uint64_t cpucusec_overhead(void) {
+  uint64_t t0, t1, overhead = -1LL;
+  uint64_t i;
+
+  for(i=0;i<100000;i++) {
+    t0 = cpucusec();
+    __asm__ volatile ("");
+    t1 = cpucusec();
     if(t1 - t0 < overhead)
       overhead = t1 - t0;
   }

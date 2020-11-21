@@ -10,7 +10,8 @@
 #define cpucycles PAPI_get_real_cyc
 #define cpucusec PAPI_get_real_usec
 
-
+extern inline uint64_t cpucycles_overhead(void);
+extern inline uint64_t cpucusec_overhead(void);
 #else
 
 #ifdef USE_RDPMC  /* Needs echo 2 > /sys/devices/cpu/rdpmc */
