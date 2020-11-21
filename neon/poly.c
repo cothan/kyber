@@ -119,25 +119,6 @@ void poly_tobytes(uint8_t r[KYBER_POLYBYTES], poly *a, const uint8_t reduce)
 }
 
 /*************************************************
-* Name:        poly_frombytes
-*
-* Description: De-serialization of a polynomial;
-*              inverse of poly_tobytes
-*
-* Arguments:   - poly *r:          pointer to output polynomial
-*              - const uint8_t *a: pointer to input byte array
-*                                  (of KYBER_POLYBYTES bytes)
-**************************************************/
-void poly_frombytes(poly *r, const uint8_t a[KYBER_POLYBYTES])
-{
-  unsigned int i;
-  for(i=0;i<KYBER_N/2;i++) {
-    r->coeffs[2*i]   = ((a[3*i+0] >> 0) | ((uint16_t)a[3*i+1] << 8)) & 0xFFF;
-    r->coeffs[2*i+1] = ((a[3*i+1] >> 4) | ((uint16_t)a[3*i+2] << 4)) & 0xFFF;
-  }
-}
-
-/*************************************************
 * Name:        poly_frommsg
 *
 * Description: Convert 32-byte message to polynomial
