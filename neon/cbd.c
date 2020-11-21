@@ -93,6 +93,36 @@ Use 18 SIMD registers
     x.val[2] = (int16x8_t)y17;                                                     \
     x.val[3] = (int16x8_t)y21;
 
+/* 
+c[0]: x | 12 | x | 8  -- x | 4  | x | 0
+c[1]: x | 13 | x | 9  -- x | 5  | x | 1
+c[2]: x | 14 | x | 10 -- x | 6  | x | 2
+c[3]: x | 15 | x | 11 -- x | 7  | x | 3
+
+c[0]: x | 28 | x | 24 -- x | 20  | x | 16
+c[1]: x | 29 | x | 25 -- x | 21  | x | 17
+c[2]: x | 30 | x | 26 -- x | 22  | x | 18
+c[3]: x | 31 | x | 27 -- x | 23  | x | 19
+Transpose
+c_out[0]: | 28 | 24 | 20 | 16 --  12 | 8  | 4  | 0
+c_out[1]: | 29 | 25 | 21 | 17 --  13 | 9  | 5  | 1
+c_out[2]: | 30 | 26 | 22 | 18 --  14 | 10 | 6  | 2
+c_out[3]: | 31 | 27 | 23 | 19 --  15 | 11 | 7  | 3
+*/
+#define transpose4x81(x, y, i)       \
+    y0 = vmovn_s32(y[i + 0]);        \
+    y1 = vmovn_s32(y[i + 1]);        \
+    y2 = vmovn_s32(y[i + 2]);        \
+    y3 = vmovn_s32(y[i + 3]);        \
+    y4 = vmovn_s32(y[i + 4]);        \
+    y5 = vmovn_s32(y[i + 5]);        \
+    y6 = vmovn_s32(y[i + 6]);        \
+    y7 = vmovn_s32(y[i + 7]);        \
+    x.val[0] = vcombine_s16(y0, y4); \
+    x.val[1] = vcombine_s16(y1, y5); \
+    x.val[2] = vcombine_s16(y2, y6); \
+    x.val[3] = vcombine_s16(y3, y7);
+
 #define transpose4x8(x, y, i)                                       \
     y16 = vtrn1q_u16((uint16x8_t)y[i + 0], (uint16x8_t)y[i + 1]);   \
     y18 = vtrn1q_u16((uint16x8_t)y[i + 2], (uint16x8_t)y[i + 3]);   \
@@ -238,6 +268,8 @@ void neon_cbd3(poly *r, const uint8_t buf[3 * KYBER_N / 4])
     idx = vld1q_u8_x4(ptr_idx);
 
     uint32x4x4_t t, d, tmp; // 12
+
+    int16x4_t y0, y1, y2, y3, y4, y5, y6, y7;
 
     int j = 0;
     // Total SIMD registers: 30 (as checked in assembly -O3)
@@ -401,21 +433,85 @@ void neon_cbd3(poly *r, const uint8_t buf[3 * KYBER_N / 4])
         vand(b, b, const_0x7);
         vsub(c[15], (int32x4_t)a, (int32x4_t)b);
 
-        transpose4x8(c_out, c, 0);
-        vstore(&r->coeffs[j], c_out);
+
+        // c[0]: x | 12 | x | 8  -- x | 4  | x | 0
+        // c[1]: x | 13 | x | 9  -- x | 5  | x | 1
+        // c[2]: x | 14 | x | 10 -- x | 6  | x | 2
+        // c[3]: x | 15 | x | 11 -- x | 7  | x | 3
+        // 
+        // c[0]: x | 28 | x | 24 -- x | 20  | x | 16
+        // c[1]: x | 29 | x | 25 -- x | 21  | x | 17
+        // c[2]: x | 30 | x | 26 -- x | 22  | x | 18
+        // c[3]: x | 31 | x | 27 -- x | 23  | x | 19
+        // Transpose
+        // c_out[0]: | 28 | 24 | 20 | 16 --  12 | 8  | 4  | 0
+        // c_out[1]: | 29 | 25 | 21 | 17 --  13 | 9  | 5  | 1
+        // c_out[2]: | 30 | 26 | 22 | 18 --  14 | 10 | 6  | 2
+        // c_out[3]: | 31 | 27 | 23 | 19 --  15 | 11 | 7  | 3
+        transpose4x81(c_out, c, 0);
+        // vstore(&r->coeffs[j], c_out);
+        vst4q_s16(&r->coeffs[j], c_out);
         j += 32;
-        transpose4x8(c_out, c, 8);
-        vstore(&r->coeffs[j], c_out);
+        transpose4x81(c_out, c, 8);
+        // vstore(&r->coeffs[j], c_out);
+        vst4q_s16(&r->coeffs[j], c_out);
         j += 32;
     }
 }
+
+
+/*************************************************
+* Name:        load24_littleendian
+*
+* Description: load 3 bytes into a 32-bit integer
+*              in little-endian order
+*              This function is only needed for Kyber-512
+*
+* Arguments:   - const uint8_t *x: pointer to input byte array
+*
+* Returns 32-bit unsigned integer loaded from x (most significant byte is zero)
+**************************************************/
+#if KYBER_ETA1 == 3
+static uint32_t load24_littleendian(const uint8_t x[3])
+{
+  uint32_t r;
+  r  = (uint32_t)x[0];
+  r |= (uint32_t)x[1] << 8;
+  r |= (uint32_t)x[2] << 16;
+  return r;
+}
+#endif
+
+
+#if KYBER_ETA1 == 3
+static void cbd3(poly *r, const uint8_t buf[3*KYBER_N/4])
+{
+  unsigned int i,j;
+  uint32_t t,d;
+  int16_t a,b;
+
+  for(i=0;i<KYBER_N/4;i++) {
+    t  = load24_littleendian(buf+3*i);
+    d  = t & 0x00249249;
+    d += (t>>1) & 0x00249249;
+    d += (t>>2) & 0x00249249;
+
+    for(j=0;j<4;j++) {
+      a = (d >> (6*j+0)) & 0x7;
+      b = (d >> (6*j+3)) & 0x7;
+      r->coeffs[4*i+j] = a - b;
+    }
+  }
+}
+#endif
+
 
 void cbd_eta1(poly *r, const uint8_t buf[KYBER_ETA1 * KYBER_N / 4])
 {
 #if KYBER_ETA1 == 2
     neon_cbd2(r, buf);
 #elif KYBER_ETA1 == 3
-    neon_cbd3(r, buf);
+    cbd3(r, buf);
 #else
 #error "This implementation requires eta1 in {2,3}"
 #endif
@@ -430,7 +526,7 @@ void cbd_eta2(poly *r, const uint8_t buf[KYBER_ETA1 * KYBER_N / 4])
 #endif
 }
 
-/*
+/* 
 #include <string.h>
 #include <stdio.h>
 #include <sys/random.h>
