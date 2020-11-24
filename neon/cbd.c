@@ -3,180 +3,113 @@
 #include "params.h"
 #include "cbd.h"
 
-#define vload(c, ptr) c = vld1q_u32(ptr);
-#define vload3(c, ptr) c = vld1q_u8_x3(ptr);
-#define vstore(ptr, c) vst1q_s16_x4(ptr, c);
+#define vload2(c, ptr) c = vld2q_u8(ptr);
 
-// c = a & b
-#define vand(c, a, b) c = vandq_u32(a, b);
-
-// c = a & b
-#define vand8(c, a, b) c = vandq_u8(a, b);
-
-// c = a >> n
-#define vsr(c, a, n) c = vshrq_n_u32(a, n);
+#define vstore4(ptr, c) vst4q_s16(ptr, c);
 
 // c = a >> n
 #define vsr8(c, a, n) c = vshrq_n_u8(a, n);
 
-// c = a >> n
-#define vsri8(c, a, b, n) c = vsriq_n_u8(a, b, n);
-
-// c = a >> n
-#define vsl8(c, a, n) c = vshlq_n_u8(a, n);
-
-// c = a >> n
-#define vsr16(c, a, n) c = vshrq_n_u16(a, n);
+// c = a & b
+#define vand8(c, a, b) c = vandq_u8(a, b);
 
 // c = a + b
-#define vadd(c, a, b) c = vaddq_u32(a, b);
+#define vadd8(c, a, b) c = vaddq_u8(a, b);
 
-// c = a + b
-#define vadd16(c, a, b) c = vaddq_u16(a, b);
+// long c = a - b
+#define vsubll8(c, a, b) c = (int16x8_t) vsubl_u8(a, b);
 
-// c = a - b
-#define vsub(c, a, b) c = vsubq_s32(a, b);
+// long c = a - b
+#define vsublh8(c, a, b) c = (int16x8_t) vsubl_high_u8(a, b);
+ 
 
-/*
- * Improved in-place tranpose, minimal spill to memory.
- * Input: Memory int16_t M[8*8]
-Before Transpose
-  0   1   2   3   4   5   6   7 
-  0   1   2   3   4   5   6   7 
-  0   1   2   3   4   5   6   7 
-  0   1   2   3   4   5   6   7 
-  0   1   2   3   4   5   6   7 
-  0   1   2   3   4   5   6   7 
-  0   1   2   3   4   5   6   7 
-  0   1   2   3   4   5   6   7 
-After Transpose
-  0   0   0   0   0   0   0   0 
-  1   1   1   1   1   1   1   1 
-  2   2   2   2   2   2   2   2 
-  3   3   3   3   3   3   3   3 
-  4   4   4   4   4   4   4   4 
-  5   5   5   5   5   5   5   5 
-  6   6   6   6   6   6   6   6 
-  7   7   7   7   7   7   7   7 
------------
-Use 18 SIMD registers 
- */
-#define transpose8x8(x, y)                                                         \
-    uint16x8_t y8, y9, y12, y13, y16, y17, y18, y19, y20, y21, y24, y25, y26, y27; \
-    y16 = vtrn1q_u16((uint16x8_t)y[0], (uint16x8_t)y[1]);                          \
-    y17 = vtrn2q_u16((uint16x8_t)y[0], (uint16x8_t)y[1]);                          \
-    y18 = vtrn1q_u16((uint16x8_t)y[2], (uint16x8_t)y[3]);                          \
-    y19 = vtrn2q_u16((uint16x8_t)y[2], (uint16x8_t)y[3]);                          \
-    y24 = (uint16x8_t)vtrn1q_u32((uint32x4_t)y16, (uint32x4_t)y17);                \
-    y25 = (uint16x8_t)vtrn2q_u32((uint32x4_t)y16, (uint32x4_t)y17);                \
-    y26 = (uint16x8_t)vtrn1q_u32((uint32x4_t)y18, (uint32x4_t)y19);                \
-    y27 = (uint16x8_t)vtrn2q_u32((uint32x4_t)y18, (uint32x4_t)y19);                \
-    y8 = (uint16x8_t)vtrn1q_u32((uint32x4_t)y24, (uint32x4_t)y26);                 \
-    y9 = (uint16x8_t)vtrn1q_u32((uint32x4_t)y25, (uint32x4_t)y27);                 \
-    y16 = vtrn1q_u16((uint16x8_t)y[4], (uint16x8_t)y[5]);                          \
-    y17 = vtrn2q_u16((uint16x8_t)y[4], (uint16x8_t)y[5]);                          \
-    y18 = vtrn1q_u16((uint16x8_t)y[6], (uint16x8_t)y[7]);                          \
-    y19 = vtrn2q_u16((uint16x8_t)y[6], (uint16x8_t)y[7]);                          \
-    y24 = (uint16x8_t)vtrn1q_u32((uint32x4_t)y16, (uint32x4_t)y17);                \
-    y25 = (uint16x8_t)vtrn2q_u32((uint32x4_t)y16, (uint32x4_t)y17);                \
-    y26 = (uint16x8_t)vtrn1q_u32((uint32x4_t)y18, (uint32x4_t)y19);                \
-    y27 = (uint16x8_t)vtrn2q_u32((uint32x4_t)y18, (uint32x4_t)y19);                \
-    y12 = (uint16x8_t)vtrn1q_u32((uint32x4_t)y24, (uint32x4_t)y26);                \
-    y13 = (uint16x8_t)vtrn1q_u32((uint32x4_t)y25, (uint32x4_t)y27);                \
-                                                                                   \
-    y16 = (uint16x8_t)vtrn1q_u64((uint64x2_t)y8, (uint64x2_t)y12);                 \
-    y17 = (uint16x8_t)vtrn2q_u64((uint64x2_t)y8, (uint64x2_t)y12);                 \
-    y20 = (uint16x8_t)vtrn1q_u64((uint64x2_t)y9, (uint64x2_t)y13);                 \
-    y21 = (uint16x8_t)vtrn2q_u64((uint64x2_t)y9, (uint64x2_t)y13);                 \
-    x.val[0] = (int16x8_t)y16;                                                     \
-    x.val[1] = (int16x8_t)y20;                                                     \
-    x.val[2] = (int16x8_t)y17;                                                     \
-    x.val[3] = (int16x8_t)y21;
-
-static 
+static
 void neon_cbd2(poly *r, const uint8_t buf[2 * KYBER_N / 4])
 {
-    uint32x4_t t, d;   // 2
-    uint32x4_t a, b;   // 2
-    int32x4_t c[8];    // 8
-    int16x8x4_t out_c; // 4
-    uint32x4_t const_0x55555555, const_0x3;
-    const_0x55555555 = vdupq_n_u32(0x55555555);
-    const_0x3 = vdupq_n_u32(0x3);
+    uint8x16x2_t t, d;   // 4
+    uint8x16x2_t a, b;   // 4
+    int16x8x4_t res1, res2; // 4
+    
+    uint8x16_t const_0x55, const_0x3; // 2
+    const_0x55 = vdupq_n_u8(0x55);
+    const_0x3  = vdupq_n_u8(0x3);
 
-    // Total SIMD register: 20
-    int j = 0;
-    for (int i = 0; i < KYBER_N / 2; i += 16)
+    // Total SIMD register: 18
+    unsigned int j = 0;
+    for (unsigned int i = 0; i < KYBER_N / 2; i += 16*2)
     {
-        vload(t, (uint32_t *)&buf[i]);
+        // 0, 2, 4 , 6,... 
+        // 1, 3, 5 , 7,... 
+        vload2(t, &buf[i]);
         // d = t & 0x55555555
-        vand(d, t, const_0x55555555);
+        vand8(d.val[0], t.val[0], const_0x55);
+        vand8(d.val[1], t.val[1], const_0x55);
         // t = (t >> 1) & 0x55555555
-        vsr(t, t, 1);
-        vand(t, t, const_0x55555555);
+        vsr8(t.val[0], t.val[0], 1);
+        vsr8(t.val[1], t.val[1], 1);
+        vand8(t.val[0], t.val[0], const_0x55);
+        vand8(t.val[1], t.val[1], const_0x55);
+    
         // d += t
-        vadd(d, d, t);
+        vadd8(d.val[0], d.val[0], t.val[0]);
+        vadd8(d.val[1], d.val[1], t.val[1]);
+    
+        // Get a0, a2
+        vand8(a.val[0], d.val[0], const_0x3);
+        vand8(a.val[1], d.val[1], const_0x3);
+    
+        // Get b0, b2
+        vsr8(b.val[0], d.val[0], 2);
+        vsr8(b.val[1], d.val[1], 2);
+        
+        vand8(b.val[0], b.val[0], const_0x3);
+        vand8(b.val[1], b.val[1], const_0x3);
+        
+        // 0 2  4 6  -- 8 10 12 14 | 0 4  8 12 -- 16 20 24 28 | 0
+        // 1 3  5 7  -- 9 11 13 15 | 2 6 10 14 -- 18 22 26 30 | 2
+        vsubll8(res1.val[0], vget_low_u8(a.val[0]), vget_low_u8(b.val[0]));
+        vsubll8(res1.val[2], vget_low_u8(a.val[1]), vget_low_u8(b.val[1]));
+        
+        // 16 18 20 22  -- 24 26 28 30 | 32 36 40 44 -- 48 52 56 60 | 0
+        // 17 19 21 23  -- 25 27 29 31 | 34 38 42 46 -- 50 54 58 62 | 2
+        vsublh8(res2.val[0], a.val[0], b.val[0]);
+        vsublh8(res2.val[2], a.val[1], b.val[1]);
 
-        // C1
-        // 1st iter
-        vsr(b, d, 2);
-        vand(a, d, const_0x3);
-        vand(b, b, const_0x3);
-        vsub(c[0], (int32x4_t)a, (int32x4_t)b);
+        
+        // Get a1, a3
+        vsr8(a.val[0], d.val[0], 4);
+        vsr8(a.val[1], d.val[1], 4);
+    
+        vand8(a.val[0], a.val[0], const_0x3);
+        vand8(a.val[1], a.val[1], const_0x3);
+        
+        // Get b1, b3
+        vsr8(b.val[0], d.val[0], 6);
+        vsr8(b.val[1], d.val[1], 6);
+        
+        // 0 2  4 6  -- 8 10 12 14 | 1 5  9 13 -- 17 21 25 29 | 1
+        // 1 3  5 7  -- 9 11 13 15 | 3 7 11 15 -- 19 23 27 31 | 3
+        vsubll8(res1.val[1], vget_low_u8(a.val[0]), vget_low_u8(b.val[0]));
+        vsubll8(res1.val[3], vget_low_u8(a.val[1]), vget_low_u8(b.val[1]));
+        
+        // 16 18 20 22  -- 24 26 28 30 | 33 37 41 45 -- 49 53 57 61 | 1
+        // 17 19 21 23  -- 25 27 29 31 | 35 39 43 47 -- 51 55 59 63 | 3
+        vsublh8(res2.val[1], a.val[0], b.val[0]);
+        vsublh8(res2.val[3], a.val[1], b.val[1]);
+        
 
-        // 2nd iter
-        vsr(a, d, 4);
-        vsr(b, d, 6);
-        vand(a, a, const_0x3);
-        vand(b, b, const_0x3);
-        vsub(c[1], (int32x4_t)a, (int32x4_t)b);
-
-        // 3rd iter
-        vsr(a, d, 8);
-        vsr(b, d, 10);
-        vand(a, a, const_0x3);
-        vand(b, b, const_0x3);
-        vsub(c[2], (int32x4_t)a, (int32x4_t)b);
-
-        // 3rd iter
-        vsr(a, d, 12);
-        vsr(b, d, 14);
-        vand(a, a, const_0x3);
-        vand(b, b, const_0x3);
-        vsub(c[3], (int32x4_t)a, (int32x4_t)b);
-
-        // 4th iter
-        vsr(a, d, 16);
-        vsr(b, d, 18);
-        vand(a, a, const_0x3);
-        vand(b, b, const_0x3);
-        vsub(c[4], (int32x4_t)a, (int32x4_t)b);
-
-        // 5th iter
-        vsr(a, d, 20);
-        vsr(b, d, 22);
-        vand(a, a, const_0x3);
-        vand(b, b, const_0x3);
-        vsub(c[5], (int32x4_t)a, (int32x4_t)b);
-
-        // 6th iter
-        vsr(a, d, 24);
-        vsr(b, d, 26);
-        vand(a, a, const_0x3);
-        vand(b, b, const_0x3);
-        vsub(c[6], (int32x4_t)a, (int32x4_t)b);
-
-        // 7th iter
-        vsr(a, d, 28);
-        vsr(b, d, 30);
-        vand(a, a, const_0x3);
-        vand(b, b, const_0x3);
-        vsub(c[7], (int32x4_t)a, (int32x4_t)b);
-
-        transpose8x8(out_c, c);
-
-        vstore(&r->coeffs[j], out_c);
-        j += 32;
+        // 0 2  4 6  -- 8 10 12 14 | 0 4  8 12 -- 16 20 24 28 | 1-0
+        // 0 2  4 6  -- 8 10 12 14 | 1 5  9 13 -- 17 21 25 29 | 1-1
+        // 1 3  5 7  -- 9 11 13 15 | 2 6 10 14 -- 18 22 26 30 | 1-2
+        // 1 3  5 7  -- 9 11 13 15 | 3 7 11 15 -- 19 23 27 31 | 1-3
+        // 16 18 20 22  -- 24 26 28 30 | 32 36 40 44 -- 48 52 56 60 | 2-0
+        // 16 18 20 22  -- 24 26 28 30 | 33 37 41 45 -- 49 53 57 61 | 2-1
+        // 17 19 21 23  -- 25 27 29 31 | 34 38 42 46 -- 50 54 58 62 | 2-2
+        // 17 19 21 23  -- 25 27 29 31 | 35 39 43 47 -- 51 55 59 63 | 2-3
+        vstore4(&r->coeffs[j], res1);
+        j+=32;
+        vstore4(&r->coeffs[j], res2);
+        j+=32;
     }
 }
 
@@ -247,7 +180,7 @@ void cbd_eta2(poly *r, const uint8_t buf[KYBER_ETA1 * KYBER_N / 4])
 #endif
 }
 
-/* 
+/*
 #include <string.h>
 #include <stdio.h>
 #include <sys/random.h>
@@ -256,7 +189,7 @@ void compare(poly *r_gold, poly *r, uint8_t *buf, const char *string)
 {
     printf("%s\n", string);
     int16_t a, b, count = 0;
-    for (int i = 0; i < 32; i++)
+    for (int i = 0; i < 64; i++)
     {
         a = r_gold->coeffs[i];
         b = r->coeffs[i];
@@ -265,7 +198,7 @@ void compare(poly *r_gold, poly *r, uint8_t *buf, const char *string)
             printf("%2d: %2x | %d != %d\n", i, buf[i / 2], a, b);
             count++;
         }
-        if (count == 24)
+        if (count == 64)
             break;
     }
 }
@@ -273,13 +206,12 @@ void compare(poly *r_gold, poly *r, uint8_t *buf, const char *string)
 #define SIZE1 (KYBER_ETA1 * KYBER_N / 4)
 #define SIZE2 (KYBER_ETA2 * KYBER_N / 4)
 
-static uint32_t load24_littleendian(const uint8_t x[3])
+void genrand(uint8_t *buf, unsigned int buflen)
 {
-    uint32_t r;
-    r = (uint32_t)x[0];
-    r |= (uint32_t)x[1] << 8;
-    r |= (uint32_t)x[2] << 16;
-    return r;
+    for (uint8_t i = 0; i < buflen; i++)
+    {
+        buf[i] = i;
+    }
 }
 
 uint32_t test(uint8_t *buf)
@@ -343,6 +275,58 @@ uint32_t test(uint8_t *buf)
     return 0;
 }
 
+void test_neon_new(uint16_t *c, uint8_t *buf, unsigned int buflen)
+{
+    uint8_t a[8], b[8], t[4], d[4];
+    for (unsigned int i = 0; i < buflen; i+=4)
+    {
+        t[0] = buf[i];
+        t[1] = buf[i+ 1];
+        t[2] = buf[i+ 2];
+        t[3] = buf[i+ 3];
+
+        d[0] = t[0] & 0x55;
+        d[1] = t[1] & 0x55;
+        d[2] = t[2] & 0x55;
+        d[3] = t[3] & 0x55;
+
+        d[0] += (t[0]>>1) & 0x55;
+        d[1] += (t[1]>>1) & 0x55;
+        d[2] += (t[2]>>1) & 0x55;
+        d[3] += (t[3]>>1) & 0x55;
+
+        a[0] = (d[0] >> 0) & 0x3;
+        b[0] = (d[0] >> 2) & 0x3;
+        a[2] = (d[1] >> 0) & 0x3;
+        b[2] = (d[1] >> 2) & 0x3;
+        a[4] = (d[2] >> 0) & 0x3;
+        b[4] = (d[2] >> 2) & 0x3;
+        a[6] = (d[3] >> 0) & 0x3;
+        b[6] = (d[3] >> 2) & 0x3;
+
+        c[0] = a[0] - b[0];
+        c[2] = a[2] - b[2];
+        c[4] = a[4] - b[4];
+        c[6] = a[6] - b[6];
+
+        a[1] = (d[0] >> 4) & 0x3;
+        b[1] = (d[0] >> 6) & 0x3;
+        a[3] = (d[1] >> 4) & 0x3;
+        b[3] = (d[1] >> 6) & 0x3;
+        a[5] = (d[2] >> 4) & 0x3;
+        b[5] = (d[2] >> 6) & 0x3;
+        a[7] = (d[3] >> 4) & 0x3;
+        b[7] = (d[3] >> 6) & 0x3;
+
+        c[1] = a[1] - b[1];
+        c[3] = a[3] - b[3];
+        c[5] = a[5] - b[5];
+        c[7] = a[7] - b[7];
+        c+=8;
+    }
+}
+
+
 int main(void)
 {
     uint8_t buf1[SIZE1], buf2[SIZE2];
@@ -360,8 +344,8 @@ int main(void)
         if (memcmp(r_gold.coeffs, r.coeffs, KYBER_N))
             return 1;
 
-        cbd_eta2(&r_gold, buf2);
-        neon_cbd_eta2(&r, buf2);
+        test_neon_new(&r_gold.coeffs, buf2, SIZE2);
+        neon_cbd2(&r, buf2);
 
         compare(&r_gold, &r, buf2, "CBD_ETA2");
 
@@ -371,5 +355,5 @@ int main(void)
     return 0;
 }
 
-//gcc cbd.c neon_cbd.c -o neon_cbd -g3 -O0 -Wall -Wextra -Wpedantic
+//gcc cbd.c -o neon_cbd -g3 -O0 -Wall -Wextra -Wpedantic
 */
