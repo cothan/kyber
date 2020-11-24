@@ -49,6 +49,11 @@ speed: \
   test_speedusec768 \
   test_speedusec1024
 
+speedcycles: \
+  test_speed512 \
+  test_speed768 \
+  test_speed1024
+
 shared: \
   libpqcrystals_kyber512_neon.so \
   libpqcrystals_kyber768_neon.so \
@@ -202,3 +207,8 @@ bench:
 	./test_speedusec512
 	./test_speedusec768
 	./test_speedusec1024
+
+benchcycles:
+	./test_speed512
+	./test_speed768
+	./test_speed1024
