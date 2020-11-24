@@ -20,3 +20,4 @@ ref/test_speedusec1024
 neon/test_speedusec1024
 neon/test_speedusec768
 neon/test_speedusec512
+neon/cbd
