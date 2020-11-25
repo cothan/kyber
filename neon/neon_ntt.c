@@ -6,10 +6,28 @@
 /******8888888888888888888888888***************/
 
 // Load int16x8_t c <= ptr*
-#define vload8(c, ptr) c = vld1q_s16(ptr);
+#define vload(c, ptr) c = vld1q_s16(ptr);
 
 // Store *ptr <= c
-#define vstore8(ptr, c) vst1q_s16(ptr, c);
+#define vstore(ptr, c) vst1q_s16(ptr, c);
+
+// Load int16x8_t c <= ptr*
+#define vloadx2(c, ptr) c = vld1q_s16_x2(ptr);
+
+// Store *ptr <= c
+#define vstorex2(ptr, c) vst1q_s16_x2(ptr, c);
+
+// Load int16x8_t c <= ptr*
+#define vloadx4(c, ptr) c = vld1q_s16_x4(ptr);
+
+// Store *ptr <= c
+#define vstorex4(ptr, c) vst1q_s16_x4(ptr, c);
+
+// Load int16x8_t c <= ptr*
+#define vload4(c, ptr) c = vld4q_s16(ptr);
+
+// Store *ptr <= c
+#define vstore4(ptr, c) vst4q_s16(ptr, c);
 
 // Combine in16x8_t c: low | high
 #define vcombine(c, low, high) c = vcombine_s16(low, high);
@@ -125,6 +143,7 @@ void neon_invntt(int16_t r[256]) {
   int32x4_t t1, t2, t3, t4, t5, t6, t7, t8, t9, ta, tb, tc;         // 12
   int32x4_t neon_qinv, neon_kyberq;                                 // 2
   int16x8x4_t ab;                                                   // 4
+  int16x8x2_t aa, bb;                                               // 2
   // End
   neon_qinv = vdupq_n_s32(QINV << 16);
   neon_kyberq = vdupq_n_s32(-KYBER_Q);
@@ -142,12 +161,11 @@ void neon_invntt(int16_t r[256]) {
     // ab.val[1] = 1, 5, 9, 13, 17, 21, 25, 29
     // ab.val[2] = 2, 6, 10, 14, 18, 22, 26, 30
     // al.val[3] = 3, 7, 11, 15, 19, 23, 27, 31
-
-    vload8(neon_zetas, &zetas_inv[k]);
+    vload(neon_zetas, &zetas_inv[k]);
     vlo(neon_zeta1, neon_zetas);
     vhi(neon_zeta2, neon_zetas);
     //
-    ab = vld4q_s16(&r[j]);
+    vload4(ab, &r[j]);
 
     at = ab.val[0];
 
@@ -166,7 +184,6 @@ void neon_invntt(int16_t r[256]) {
     barrett(ab.val[0], ct, c_lo, c_hi, t1, t2, neon_v, neon_kyberq16);
 
     vcombine(ab.val[2], a_lo, a_hi);
-    //
 
     bt = ab.val[1];
     // 1: 1 + 3
@@ -184,8 +201,8 @@ void neon_invntt(int16_t r[256]) {
 
     vcombine(ab.val[3], b_lo, b_hi);
 
-    vst4q_s16(&r[j], ab);
-    //
+    vstore4(&r[j], ab);
+
     k += 8;
   }
 
@@ -203,8 +220,9 @@ void neon_invntt(int16_t r[256]) {
     // b: 8, 9, 10, 11 | 12, 13, 14, 15
     // c: 16, 17, 18, 19 | 20, 21, 22, 23
     // d: 24, 25, 26, 27 | 28, 29, 30, 31
-    vload8(a, &r[j]);
-    vload8(b, &r[j + 8]);
+    vloadx2(aa, &r[j]);
+    a = aa.val[0];
+    b = aa.val[1];
 
     vlo(a_lo, a);
     vhi(a_hi, a);
@@ -234,14 +252,16 @@ void neon_invntt(int16_t r[256]) {
     vcombine(a, a_lo, a_hi);
     vcombine(b, b_lo, b_hi);
 
-    vstore8(&r[j], a);
-    vstore8(&r[j + 8], b);
+    aa.val[0] = a;
+    aa.val[1] = b;
+    vstorex2(&r[j], aa);
 
     vdup(neon_zeta3, zetas_inv[k++]);
     vdup(neon_zeta4, zetas_inv[k++]);
 
-    vload8(c, &r[j + 16]);
-    vload8(d, &r[j + 24]);
+    vloadx2(bb, &r[j+16]);
+    c = bb.val[0];
+    d = bb.val[1];
     //
     vlo(c_lo, c);
     vhi(c_hi, c);
@@ -271,8 +291,9 @@ void neon_invntt(int16_t r[256]) {
     vcombine(c, c_lo, c_hi);
     vcombine(d, d_lo, d_hi);
 
-    vstore8(&r[j + 16], c);
-    vstore8(&r[j + 24], d);
+    bb.val[0] = c;
+    bb.val[1] = d;
+    vstorex2(&r[j+16], bb);
   }
 
   //   Layer 3
@@ -280,8 +301,9 @@ void neon_invntt(int16_t r[256]) {
     //   a - b, c - d
     vdup(neon_zeta1, zetas_inv[k++]);
     //
-    vload8(a, &r[j]);
-    vload8(b, &r[j + 8]);
+    vloadx2(aa, &r[j]);
+    a = aa.val[0];
+    b = aa.val[1];
 
     c = a;
     //  a : c(a) + b
@@ -300,13 +322,15 @@ void neon_invntt(int16_t r[256]) {
 
     vcombine(b, b_lo, b_hi);
 
-    vstore8(&r[j], a);
-    vstore8(&r[j + 8], b);
+    aa.val[0] = a;
+    aa.val[1] = b;
+    vstorex2(&r[j], aa);
     //
     vdup(neon_zeta2, zetas_inv[k++]);
     //
-    vload8(c, &r[j + 16]);
-    vload8(d, &r[j + 24]);
+    vloadx2(bb, &r[j + 16]);
+    c = bb.val[0];
+    d = bb.val[1];
     //
     a = c;
     // c: a(c) + d
@@ -324,8 +348,9 @@ void neon_invntt(int16_t r[256]) {
 
     vcombine(d, d_lo, d_hi);
 
-    vstore8(&r[j + 16], c);
-    vstore8(&r[j + 24], d);
+    bb.val[0] = c;
+    bb.val[1] = d;
+    vstorex2(&r[j + 16], bb);
   }
 
   // Layer 4, 5, 6, 7
@@ -334,10 +359,12 @@ void neon_invntt(int16_t r[256]) {
       vdup(neon_zeta1, zetas_inv[k++]);
       for (j = start; j < start + len; j += 16) {
         //   a - c, b - d
-        vload8(a, &r[j]);
-        vload8(b, &r[j + 8]);
-        vload8(c, &r[j + len]);
-        vload8(d, &r[j + len + 8]);
+        vloadx2(aa, &r[j]);
+        a = aa.val[0];
+        b = aa.val[1];
+        vloadx2(bb, &r[j + len]);
+        c = bb.val[0];
+        d = bb.val[1];
 
         at = a;
         // a = at(a) + c
@@ -373,17 +400,19 @@ void neon_invntt(int16_t r[256]) {
 
         vcombine(d, d_lo, d_hi);
 
-        vstore8(&r[j], a);
-        vstore8(&r[j + 8], b);
-        vstore8(&r[j + len], c);
-        vstore8(&r[j + len + 8], d);
+        aa.val[0] = a;
+        aa.val[1] = b;
+        vstorex2(&r[j], aa);
+        bb.val[0] = c;
+        bb.val[1] = d;
+        vstorex2(&r[j + len], bb);
       }
     }
   }
 
   vdup(neon_zeta1, zetas_inv[127]);
   for (j = 0; j < 256; j += 32) {
-    ab = vld1q_s16_x4(&r[j]);
+    vloadx4(ab, &r[j]);
 
     vlo(a_lo, ab.val[0]);
     vhi(a_hi, ab.val[0]);
@@ -408,7 +437,7 @@ void neon_invntt(int16_t r[256]) {
     vcombine(ab.val[2], c_lo, c_hi);
     vcombine(ab.val[3], d_lo, d_hi);
 
-    vst1q_s16_x4(&r[j], ab);
+    vstorex4(&r[j], ab);
   }
 }
 
@@ -430,6 +459,7 @@ void neon_ntt(int16_t r[256]) {
   int32x4_t t1, t2, t3, t4, t5, t6, t7, t8, t9, ta, tb, tc; // 12
   int32x4_t neon_qinv, neon_kyberq;                         // 2
   int16x8x4_t ab;                                           // 4
+  int16x8x2_t aa, bb;                                       // 2
   // End
   neon_qinv = vdupq_n_s32(QINV << 16);
   neon_kyberq = vdupq_n_s32(-KYBER_Q);
@@ -445,11 +475,12 @@ void neon_ntt(int16_t r[256]) {
       vdup(neon_zeta1, zetas[k++]);
       for (j = start; j < start + len; j += 16) {
         //   a - c, b - d
-        vload8(a, &r[j]);
-        vload8(b, &r[j + 8]);
-
-        vload8(c, &r[j + len]);
-        vload8(d, &r[j + len + 8]);
+        vloadx2(aa, &r[j]);
+        a = aa.val[0];
+        b = aa.val[1];
+        vloadx2(bb, &r[j + len]);
+        c = bb.val[0];
+        d = bb.val[1];
 
         vlo(c_lo, c);
         vhi(c_hi, c);
@@ -472,11 +503,12 @@ void neon_ntt(int16_t r[256]) {
         vsub8(d, b, dt);
         vadd8(b, b, dt);
 
-        vstore8(&r[j], a);
-        vstore8(&r[j + 8], b);
-
-        vstore8(&r[j + len], c);
-        vstore8(&r[j + len + 8], d);
+        aa.val[0] = a;
+        aa.val[1] = b;
+        vstorex2(&r[j], aa);
+        bb.val[0] = c;
+        bb.val[1] = d;
+        vstorex2(&r[j + len], bb);
       }
     }
   }
@@ -484,11 +516,12 @@ void neon_ntt(int16_t r[256]) {
   //   Layer 3
   for (j = 0; j < 256; j += 32) {
     //   a - b, c - d
-    vload8(a, &r[j]);
-    vload8(b, &r[j + 8]);
+    vloadx4(ab, &r[j]);
+    a = ab.val[0];
+    b = ab.val[1];
     //
-    vload8(c, &r[j + 16]);
-    vload8(d, &r[j + 24]);
+    c = ab.val[2];
+    d = ab.val[3];
 
     //
     vlo(b_lo, b);
@@ -515,10 +548,11 @@ void neon_ntt(int16_t r[256]) {
     vsub8(d, c, dt);
     vadd8(c, c, dt);
 
-    vstore8(&r[j], a);
-    vstore8(&r[j + 8], b);
-    vstore8(&r[j + 16], c);
-    vstore8(&r[j + 24], d);
+    ab.val[0] = a;
+    ab.val[1] = b;
+    ab.val[2] = c;
+    ab.val[3] = d;
+    vstorex4(&r[j], ab);
   }
 
   // Layer 2
@@ -532,10 +566,11 @@ void neon_ntt(int16_t r[256]) {
     // b: 8, 9, 10, 11 | 12, 13, 14, 15
     // c: 16, 17, 18, 19 | 20, 21, 22, 23
     // d: 24, 25, 26, 27 | 28, 29, 30, 31
-    vload8(a, &r[j]);
-    vload8(b, &r[j + 8]);
-    vload8(c, &r[j + 16]);
-    vload8(d, &r[j + 24]);
+    vloadx4(ab, &r[j]);
+    a = ab.val[0];
+    b = ab.val[1];
+    c = ab.val[2];
+    d = ab.val[3];
 
     vlo(a_lo, a);
     vhi(a_hi, a);
@@ -578,10 +613,11 @@ void neon_ntt(int16_t r[256]) {
     vadd4(d_lo, d_lo, d_hi);
     vcombine(d, d_lo, b_hi);
 
-    vstore8(&r[j], a);
-    vstore8(&r[j + 8], b);
-    vstore8(&r[j + 16], c);
-    vstore8(&r[j + 24], d);
+    ab.val[0] = a;
+    ab.val[1] = b;
+    ab.val[2] = c;
+    ab.val[3] = d;
+    vstorex4(&r[j], ab);
   }
 
   //   Layer 1
@@ -590,8 +626,7 @@ void neon_ntt(int16_t r[256]) {
     // ab.val[1] = 1, 5, 9, 13, 17, 21, 25, 29
     // ab.val[2] = 2, 6, 10, 14, 18, 22, 26, 30
     // al.val[3] = 3, 7, 11, 15, 19, 23, 27, 31
-
-    ab = vld4q_s16(&r[j]);
+    vload4(ab, &r[j]);
 
     // a_lo
     vlo(a_lo, ab.val[2]);
@@ -599,7 +634,7 @@ void neon_ntt(int16_t r[256]) {
     vlo(b_lo, ab.val[3]);
     vhi(b_hi, ab.val[3]);
 
-    vload8(neon_zetas, &zetas[k]);
+    vload(neon_zetas, &zetas[k]);
 
     vlo(neon_zeta1, neon_zetas);
     vhi(neon_zeta2, neon_zetas);
@@ -625,6 +660,6 @@ void neon_ntt(int16_t r[256]) {
 
     k += 8;
     //
-    vst4q_s16(&r[j], ab);
+    vstore4(&r[j], ab);
   }
 }

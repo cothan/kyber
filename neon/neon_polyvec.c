@@ -64,15 +64,12 @@ void neon_polyvec_add_reduce_csubq(polyvec *c, const polyvec *a) {
   }
 }
 
-/******8888888888888888888888888***************/
-// Load int16x8x2_t c <= ptr*
-#define vload16(c, ptr) c = vld1q_s16_x2(ptr);
+/**********************************/
+// Load interleave 
+#define vload2(c, ptr) c = vld2q_s16(ptr);
 
-// Load int16x8x2_t c <= ptr*
-#define vstore16(ptr, c) vst1q_s16_x2(ptr, c);
-
-// Load int16x4_t c <= ptr*
-#define vload4(c, ptr) c = vld1_s16(ptr);
+// Store interleave
+#define vstore2(ptr, c) vst2q_s16(ptr, c);
 
 // Combine in16x8_t c: low | high
 #define vcombine(c, low, high) c = vcombine_s16(low, high);
@@ -225,7 +222,7 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
   for (j = 0; j < KYBER_N; j+=16){
     // Load Zeta
     // 64, 65, 66, 67
-    vload4(neon_zeta_positive, &zetas[k]);
+    neon_zeta_positive = vld1_s16(&zetas[k]);
     // Convert zeta to negative sign
     // -64, -64, -66, -67
     vnot4(neon_zeta_negative, neon_zeta_positive);
@@ -234,9 +231,8 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
     // Use max 8 registers
     // 0, 2, 4, 6, 8, a, c, e
     // 1, 3, 5, 7, 9, b, d, f
-    aa = vld2q_s16(&a->vec[0].coeffs[j]);
-    bb = vld2q_s16(&b->vec[0].coeffs[j]);
-
+    vload2(aa, &a->vec[0].coeffs[j]);
+    vload2(bb, &b->vec[0].coeffs[j]);
 
     // Tranpose before multiply
     transpose(ta1, ta2, aa.val[0], aa.val[1]);
@@ -315,8 +311,8 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
     /***************************/
 
     // 2nd iterator
-    aa = vld2q_s16(&a->vec[1].coeffs[j]);
-    bb = vld2q_s16(&b->vec[1].coeffs[j]);
+    vload2(aa, &a->vec[1].coeffs[j]);
+    vload2(bb, &b->vec[1].coeffs[j]);
 
     transpose(ta1, ta2, aa.val[0], aa.val[1]);
     transpose(tb1, tb2, bb.val[0], bb.val[1]);
@@ -374,8 +370,8 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
 
 #if KYBER_K >= 3 
     // 3rd iterator
-    aa = vld2q_s16(&a->vec[2].coeffs[j]);
-    bb = vld2q_s16(&b->vec[2].coeffs[j]);
+    vload2(aa, &a->vec[2].coeffs[j]);
+    vload2(bb, &b->vec[2].coeffs[j]);
 
     transpose(ta1, ta2, aa.val[0], aa.val[1]);
     transpose(tb1, tb2, bb.val[0], bb.val[1]);
@@ -431,8 +427,8 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
 #endif
 #if KYBER_K == 4
     // 3rd iterator
-    aa = vld2q_s16(&a->vec[3].coeffs[j]);
-    bb = vld2q_s16(&b->vec[3].coeffs[j]);
+    vload2(aa, &a->vec[3].coeffs[j]);
+    vload2(bb, &b->vec[3].coeffs[j]);
 
     transpose(ta1, ta2, aa.val[0], aa.val[1]);
     transpose(tb1, tb2, bb.val[0], bb.val[1]);
@@ -521,7 +517,7 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
 
     // 0, 2, 4, 6, 8, a, c, e
     // 1, 3, 5, 7, 9, b, d, f
-    vst2q_s16(&c->coeffs[j], sum);
+    vstore2(&c->coeffs[j], sum);
     k+=4;
   }
 }

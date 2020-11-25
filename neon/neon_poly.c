@@ -6,10 +6,10 @@
 
 
 // Load int16x8x4_t c <= ptr*
-#define vload(c, ptr) c = vld1q_s16_x4(ptr);
+#define vloadx4(c, ptr) c = vld1q_s16_x4(ptr);
 
 // Load int16x8x4_t c <= ptr*
-#define vstore(ptr, c) vst1q_s16_x4(ptr, c);
+#define vstorex4(ptr, c) vst1q_s16_x4(ptr, c);
 
 // Combine in16x8_t c: low | high
 #define vcombine(c, low, high) c = vcombine_s16(low, high);
@@ -81,7 +81,7 @@ void neon_poly_reduce(poly *c) {
   // Total register: 22 registers.
   unsigned int i;
   for (i = 0; i < KYBER_N; i += 32) {
-    vload(cc, &c->coeffs[i]);
+    vloadx4(cc, &c->coeffs[i]);
 
     // c = reduce(c)
     barrett(cc.val[0], aa.val[0], t0_lo, t0_hi, t01, t02, neon_v, neon_kyberq16);
@@ -90,7 +90,7 @@ void neon_poly_reduce(poly *c) {
     barrett(cc.val[3], aa.val[3], t3_lo, t3_hi, t31, t32, neon_v, neon_kyberq16);
 
     // c = t;
-    vstore(&c->coeffs[i], cc);
+    vstorex4(&c->coeffs[i], cc);
   }
 }
 
@@ -114,8 +114,8 @@ void neon_poly_add_reduce_csubq(poly *c, const poly *a) {
   // Total register: 26 registers.
   unsigned int i;
   for (i = 0; i < KYBER_N; i += 32) {
-    vload(aa, &a->coeffs[i]);
-    vload(cc, &c->coeffs[i]);
+    vloadx4(aa, &a->coeffs[i]);
+    vloadx4(cc, &c->coeffs[i]);
 
     // c = c - a;
     vadd(cc.val[0], cc.val[0], aa.val[0]);
@@ -149,7 +149,7 @@ void neon_poly_add_reduce_csubq(poly *c, const poly *a) {
     vsub(cc.val[3], cc.val[3], aa.val[3]);
 
     // c = t;
-    vstore(&c->coeffs[i], cc);
+    vstorex4(&c->coeffs[i], cc);
   }
 }
 
@@ -174,8 +174,8 @@ void neon_poly_sub_reduce_csubq(poly *c, const poly *a) {
   unsigned int i;
   for (i = 0; i < KYBER_N; i += 32)
   {
-    vload(aa, &a->coeffs[i]);
-    vload(cc, &c->coeffs[i]);
+    vloadx4(aa, &a->coeffs[i]);
+    vloadx4(cc, &c->coeffs[i]);
 
     // c = c - a;
     vsub(cc.val[0], cc.val[0], aa.val[0]);
@@ -209,7 +209,7 @@ void neon_poly_sub_reduce_csubq(poly *c, const poly *a) {
     vsub(cc.val[3], cc.val[3], aa.val[3]);
 
     // c = t;
-    vstore(&c->coeffs[i], cc);
+    vstorex4(&c->coeffs[i], cc);
   }
 }
 
@@ -233,9 +233,9 @@ void neon_poly_add_add_reduce_csubq(poly *c, const poly *a, const poly *b) {
   unsigned int i;
   for (i = 0; i < KYBER_N; i += 32)
   {
-    vload(aa, &a->coeffs[i]);
-    vload(bb, &b->coeffs[i]);
-    vload(cc, &c->coeffs[i]);
+    vloadx4(aa, &a->coeffs[i]);
+    vloadx4(bb, &b->coeffs[i]);
+    vloadx4(cc, &c->coeffs[i]);
 
     // a' = a + b;
     vadd(aa.val[0], aa.val[0], bb.val[0]);
@@ -275,7 +275,7 @@ void neon_poly_add_add_reduce_csubq(poly *c, const poly *a, const poly *b) {
     vsub(cc.val[3], cc.val[3], aa.val[3]);
 
     // c = t;
-    vstore(&c->coeffs[i], cc);
+    vstorex4(&c->coeffs[i], cc);
   }
 }
 
@@ -329,7 +329,7 @@ void poly_csubq(poly *r)
 
   for (unsigned int i = 0; i < KYBER_N; i+=32)
   {
-    vload(cc, &r->coeffs[i]);
+    vloadx4(cc, &r->coeffs[i]);
     // res = 0xffff if cc >= kyber_q else 0
     vcompare(res.val[0], cc.val[0], const_kyberq);
     vcompare(res.val[1], cc.val[1], const_kyberq);
@@ -348,7 +348,7 @@ void poly_csubq(poly *r)
     vsub(cc.val[2], cc.val[2], aa.val[2]);
     vsub(cc.val[3], cc.val[3], aa.val[3]);
 
-    vstore(&r->coeffs[i], cc);
+    vstorex4(&r->coeffs[i], cc);
   }
 }
 
