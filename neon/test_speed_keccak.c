@@ -11,6 +11,7 @@
 #include "cpucycles.h"
 #include "speed_print.h"
 #include "ntt.h"
+#include "symmetric.h"
 #include "papi.h"
 
 #define NTESTS 1000000
@@ -29,6 +30,10 @@ int main()
     unsigned char kexsendb[KEX_AKE_SENDBBYTES] = {0};
     unsigned char kexkey[KEX_SSBYTES] = {0};
     unsigned char msg[KYBER_INDCPA_MSGBYTES] = {0};
+    uint8_t buf1eta2[KYBER_ETA2 * KYBER_N / 4],
+            buf2eta2[KYBER_ETA2 * KYBER_N / 4];
+    uint8_t buf1eta1[KYBER_ETA1 * KYBER_N / 4],
+            buf2eta1[KYBER_ETA1 * KYBER_N / 4];
     polyvec matrix[KYBER_K];
     poly ap, bp;
     int retval; 
@@ -62,13 +67,23 @@ int main()
     end = cpucycles() - start;
     printf("poly_getnoise_eta2: %lf\n", (double) end/NTESTS);
 
-    // PAPI_hl_region_begin("SHAKE128");
-    // for (i = 0; i < NTESTS; i++)
-    // {
-    //     // t[i] = cpucycles();
-    //     (&ap, seed, 0);
-    // }
-    // PAPI_hl_region_end("SHAKE128");
+    start = cpucycles();
+    for (i = 0; i < NTESTS; i++)
+    {
+        // t[i] = cpucycles();
+        neon_prf(buf1eta1, buf2eta1, sizeof(buf2eta1), seed, 0, 1);
+    }
+    end = cpucycles() - start;
+    printf("prf: %d->%d: %lf\n", 32, sizeof(buf1eta1), (double) end/NTESTS);
+
+    start = cpucycles();
+    for (i = 0; i < NTESTS; i++)
+    {
+        // t[i] = cpucycles();
+        neon_prf(buf1eta2, buf2eta2, sizeof(buf2eta2), seed, 0, 1);
+    }
+    end = cpucycles() - start;
+    printf("prf: %d->%d: %lf\n", 32, sizeof(buf1eta2), (double) end/NTESTS);
 
 
 
