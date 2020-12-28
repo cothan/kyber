@@ -22,14 +22,14 @@ uint8_t seed[KYBER_SYMBYTES] = {0};
 int main()
 {
     unsigned int i;
-    unsigned char pk[CRYPTO_PUBLICKEYBYTES] = {0};
-    unsigned char sk[CRYPTO_SECRETKEYBYTES] = {0};
-    unsigned char ct[CRYPTO_CIPHERTEXTBYTES] = {0};
-    unsigned char key[CRYPTO_BYTES] = {0};
-    unsigned char kexsenda[KEX_AKE_SENDABYTES] = {0};
-    unsigned char kexsendb[KEX_AKE_SENDBBYTES] = {0};
-    unsigned char kexkey[KEX_SSBYTES] = {0};
-    unsigned char msg[KYBER_INDCPA_MSGBYTES] = {0};
+    // unsigned char pk[CRYPTO_PUBLICKEYBYTES] = {0};
+    // unsigned char sk[CRYPTO_SECRETKEYBYTES] = {0};
+    // unsigned char ct[CRYPTO_CIPHERTEXTBYTES] = {0};
+    // unsigned char key[CRYPTO_BYTES] = {0};
+    // unsigned char kexsenda[KEX_AKE_SENDABYTES] = {0};
+    // unsigned char kexsendb[KEX_AKE_SENDBBYTES] = {0};
+    // unsigned char kexkey[KEX_SSBYTES] = {0};
+    // unsigned char msg[KYBER_INDCPA_MSGBYTES] = {0};
     uint8_t buf1eta2[KYBER_ETA2 * KYBER_N / 4],
             buf2eta2[KYBER_ETA2 * KYBER_N / 4];
     uint8_t buf1eta1[KYBER_ETA1 * KYBER_N / 4],
