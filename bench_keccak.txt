@@ -1,0 +1,48 @@
+## NEON
+
+taskset 0x1 ./test_speed512keccak
+NTESTS: 1000000
+gen_a: 739.639527
+poly_getnoise_eta1: 243.129860
+poly_getnoise_eta2: 128.406354
+prf: 32->192: 214.035898
+prf: 32->128: 110.085158
+taskset 0x1 ./test_speed768keccak
+NTESTS: 1000000
+gen_a: 1676.778919
+poly_getnoise_eta1: 123.429326
+poly_getnoise_eta2: 123.487203
+prf: 32->128: 108.919299
+prf: 32->128: 110.470604
+taskset 0x1 ./test_speed1024keccak
+NTESTS: 1000000
+gen_a: 2955.166882
+poly_getnoise_eta1: 123.544089
+poly_getnoise_eta2: 123.489643
+prf: 32->128: 110.821432
+prf: 32->128: 109.380431
+
+
+## REF 
+
+taskset 0x1 ./test_speed512keccak
+NTESTS: 1000000
+gen_a: 890.353375
+poly_getnoise_eta1: 244.082636
+poly_getnoise_eta2: 136.704981
+prf: 32->192: 212.020072
+prf: 32->128: 114.883826
+taskset 0x1 ./test_speed768keccak
+NTESTS: 1000000
+gen_a: 2117.494203
+poly_getnoise_eta1: 135.561599
+poly_getnoise_eta2: 135.358088
+prf: 32->128: 115.301978
+prf: 32->128: 115.289077
+taskset 0x1 ./test_speed1024keccak
+NTESTS: 1000000
+gen_a: 3825.597909
+poly_getnoise_eta1: 134.879883
+poly_getnoise_eta2: 135.633467
+prf: 32->128: 114.776755
+prf: 32->128: 115.964332
