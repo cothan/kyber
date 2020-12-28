@@ -21,3 +21,9 @@ neon/test_speedusec1024
 neon/test_speedusec768
 neon/test_speedusec512
 neon/cbd
+neon/test_speed512keccak
+neon/test_speed768keccak
+neon/test_speed1024keccak
+ref/test_speed512keccak
+ref/test_speed768keccak
+ref/test_speed1024keccak
