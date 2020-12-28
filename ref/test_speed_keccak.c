@@ -37,6 +37,14 @@ int main()
     polyvec matrix[KYBER_K];
     poly ap, bp;
     int retval; 
+    xof_state state1, state2;
+
+    #define GEN_MATRIX_NBLOCKS ((12*KYBER_N/8*(1 << 12)/KYBER_Q \
+                             + XOF_BLOCKBYTES)/XOF_BLOCKBYTES)
+
+    uint8_t buf0[GEN_MATRIX_NBLOCKS * XOF_BLOCKBYTES + 2],
+            buf1[GEN_MATRIX_NBLOCKS * XOF_BLOCKBYTES + 2];
+
     printf("NTESTS: %d\n", NTESTS);
     long_long start, end;
 
@@ -88,6 +96,19 @@ int main()
     }
     end = cpucycles() - start;
     printf("prf: %d->%d: %lf\n",32, sizeof(buf2eta2), (double) end/NTESTS);
+
+
+    start = cpucycles();
+    for (i = 0; i < NTESTS; i++)
+    {
+        // t[i] = cpucycles();
+        kyber_shake128_absorb(&state1, seed, 0, 1);
+        kyber_shake128_absorb(&state2, seed, 0, 1);
+        xof_squeezeblocks(buf0, GEN_MATRIX_NBLOCKS, &state1);
+        xof_squeezeblocks(buf1, GEN_MATRIX_NBLOCKS, &state2);
+    }
+    end = cpucycles() - start;
+    printf("SHAKE128 ABS SQZ: %d->%d: %lf\n", 32, sizeof(buf1), (double) end/NTESTS);
 
 
     return 0;
