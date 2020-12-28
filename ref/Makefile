@@ -27,6 +27,9 @@ all: \
   test_speed512 \
   test_speed768 \
   test_speed1024 \
+  test_speed512keccak \
+  test_speed768keccak \
+  test_speed1024keccak \
   test_speedusec512 \
   test_speedusec768 \
   test_speedusec1024 \
@@ -48,6 +51,11 @@ speed: \
   test_speedusec512 \
   test_speedusec768 \
   test_speedusec1024
+
+speed_keccak: \
+  test_speed512keccak \
+  test_speed768keccak \
+  test_speed1024keccak
 
 shared: \
   libpqcrystals_kyber512_ref.so \
@@ -109,6 +117,15 @@ test_speed768: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c speed_p
 
 test_speed1024: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed.c randombytes.c kex.c kex.h
 	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c cpucycles.c speed_print.c kex.c test_speed.c -o test_speed1024
+
+test_speed512keccak: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed_keccak.c randombytes.c kex.c kex.h
+	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c cpucycles.c speed_print.c kex.c test_speed_keccak.c -o test_speed512keccak
+
+test_speed768keccak: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed_keccak.c randombytes.c kex.c kex.h
+	$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) randombytes.c cpucycles.c speed_print.c kex.c test_speed_keccak.c -o test_speed768keccak
+
+test_speed1024keccak: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed_keccak.c randombytes.c kex.c kex.h
+	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c cpucycles.c speed_print.c kex.c test_speed_keccak.c -o test_speed1024keccak
 
 test_speedusec512: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed_usec.c randombytes.c kex.c kex.h
 	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c cpucycles.c speed_print.c kex.c test_speed_usec.c -o test_speedusec512
@@ -197,8 +214,16 @@ clean:
 	-$(RM) -rf test_speedusec512
 	-$(RM) -rf test_speedusec768
 	-$(RM) -rf test_speedusec1024
+	-$(RM) -rf test_speed512keccak
+	-$(RM) -rf test_speed768keccak
+	-$(RM) -rf test_speed1024keccak
 
 bench: 
 	./test_speedusec512
 	./test_speedusec768
 	./test_speedusec1024
+
+bench_keccak: 
+	taskset 0x1 ./test_speed512keccak
+	taskset 0x1 ./test_speed768keccak
+	taskset 0x1 ./test_speed1024keccak

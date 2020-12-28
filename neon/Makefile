@@ -232,3 +232,8 @@ benchcycles:
 	./test_speed512
 	./test_speed768
 	./test_speed1024
+
+bench_keccak: 
+	taskset 0x1 ./test_speed512keccak
+	taskset 0x1 ./test_speed768keccak
+	taskset 0x1 ./test_speed1024keccak

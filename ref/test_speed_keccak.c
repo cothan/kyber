@@ -48,7 +48,8 @@ int main()
     for (i = 0; i < NTESTS; i++)
     {
         // t[i] = cpucycles();
-        neon_poly_getnoise_eta1_2x(&ap, &bp, seed, 0, 1);
+        poly_getnoise_eta1(&ap, seed, 1);
+        poly_getnoise_eta1(&bp, seed, 0);
     }
     end = cpucycles() - start;
     printf("poly_getnoise_eta1: %lf\n", (double) end/NTESTS);
@@ -57,19 +58,11 @@ int main()
     for (i = 0; i < NTESTS; i++)
     {
         // t[i] = cpucycles();
-        neon_poly_getnoise_eta2_2x(&ap, &bp, seed, 0, 1);
+        poly_getnoise_eta2(&ap, seed, 0);
+        poly_getnoise_eta2(&bp, seed, 1);
     }
     end = cpucycles() - start;
     printf("poly_getnoise_eta2: %lf\n", (double) end/NTESTS);
-
-    // PAPI_hl_region_begin("SHAKE128");
-    // for (i = 0; i < NTESTS; i++)
-    // {
-    //     // t[i] = cpucycles();
-    //     (&ap, seed, 0);
-    // }
-    // PAPI_hl_region_end("SHAKE128");
-
 
 
 
