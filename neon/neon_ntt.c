@@ -442,6 +442,94 @@ void neon_invntt(int16_t r[256]) {
 }
 
 
+void combined_neon_invntt(int16_t r[256])
+{
+  int j, k1, k2, k3, k4; 
+  // Register
+  int16x8x4_t v;
+  int16x8_t r0, r1, r2, r3, o_tmp, e_tmp,
+            neon_zetas1, neon_zetas2, 
+            neon_zetas3, neon_zetas4;
+  int16x4_t a_lo, a_hi, b_lo, b_hi, c_lo, c_hi, d_lo, d_hi;         // 8
+  int16x4_t zlo, zhi;
+  int32x4_t t1, t2, t3, t4, t5, t6, t7, t8, t9, ta, tb, tc;         // 12
+  // Constant 
+  int32x4_t neon_qinv, neon_kyberq;
+  int16x8_t neon_kyberq16;
+  int16x4_t neon_v;
+  neon_qinv = vdupq_n_s32(QINV << 16);
+  neon_kyberq = vdupq_n_s32(-KYBER_Q);
+  neon_kyberq16 = vdupq_n_s16(-KYBER_Q);
+  neon_v = vdup_n_s16(((1U << 26) + KYBER_Q / 2) / KYBER_Q);
+  // Scalar 
+  k1 = 0;
+  k2 = 8*(256/32); // 64
+  k3 = 96;
+  k4 = 112;
+  // End 
+
+  // Layer 1, 2, 3, 4
+  for (j = 0; j < 256; j+=32)
+  {
+    vload(neon_zetas1, &zetas_inv[k1]);
+    k1 += 8;
+    vload(neon_zetas2, &zetas_inv[k2]); // EDIT this load 4
+    k2 += 4; 
+    vload(neon_zetas3, &zetas_inv[k3]); // EDIT this load 2
+    k3 += 2; 
+    vload(neon_zetas4, &zetas_inv[k4]); // EDIT this load 1
+    k4 += 1;
+
+
+    // 1st layer 
+    // r0: 0, 4, 8,  12 | 16, 20, 24, 28
+    // r1: 1, 5, 9,  13 | 17, 21, 25, 29
+    // r2: 2, 6, 10, 14 | 18, 22, 26, 30
+    // r3: 3, 7, 11, 15 | 19, 23, 27, 31
+    vload4(v, &r[j]);
+
+    r0 = v.val[0];
+    r1 = v.val[1];
+    r2 = v.val[2];
+    r3 = v.val[3];
+
+    e_tmp = r0;
+    // 0 + 2 
+    vadd8(r0, e_tmp, r2);
+    // 0 - 2
+    vsub8(r2, e_tmp, r2);
+
+    o_tmp = r1;
+    // 1 + 3
+    vadd8(r1, o_tmp, r3);
+    // 1 - 3
+    vsub8(r1, o_tmp, r3);
+
+    vlo(a_lo, r2);
+    vhi(a_hi, r2);
+
+    vlo(b_lo, r3);
+    vhi(b_hi, r3);
+
+    vlo(zlo, neon_zetas1);
+    vhi(zhi, neon_zetas1);
+
+    fqmul(a_lo, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
+    fqmul(a_hi, zhi, t7, t8, t9, neon_qinv, neon_kyberq);
+    fqmul(b_lo, zlo, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(b_hi, zhi, ta, tb, tc, neon_qinv, neon_kyberq);
+
+    barrett(r0, e_tmp, c_lo, c_hi, t1, t2, neon_v, neon_kyberq16);
+    barrett(r1, o_tmp, d_lo, d_hi, t3, t4, neon_v, neon_kyberq16);
+
+    vcombine(r2, a_lo, a_hi);
+    vcombine(r3, b_lo, b_hi);
+  }
+}
+
+
+
+
 /*************************************************
 * Name:        ntt
 *
@@ -662,4 +750,45 @@ void neon_ntt(int16_t r[256]) {
     //
     vstore4(&r[j], ab);
   }
+}
+
+int compare(int *a, int *b, int length)
+{
+  int i, j, count = 0;
+  for (i = 0; i < length; i+=8)
+  {
+    for (j = i; j < i + 8; j++)
+    {
+      if (a[j] != b[j])
+      {
+        printf("%d: %d != %d\n", i, a[j], b[j]);
+        count++;
+      }
+      if (count > 8) 
+        return 1;
+    }
+  }
+  printf("Correct!!\n");
+  return 0;
+}
+
+
+int main(void)
+{
+  int16_t r_gold[256], r[256];
+  int i, t; 
+  for (i  = 0; i < 256; i++)
+  {
+    t = i; 
+    r[i] = t;
+    r_gold[i] = t;
+  }
+
+  neon_invntt(r_gold);
+  combined_neon_invntt(r);
+
+  if (compare(r_gold, r, 256))
+    return 1;
+
+  return 0; 
 }
