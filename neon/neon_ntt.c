@@ -2,6 +2,8 @@
 #include "params.h"
 #include "ntt.h"
 #include "reduce.h"
+#include <stdio.h>
+
 
 /******8888888888888888888888888***************/
 
@@ -205,6 +207,12 @@ void neon_invntt(int16_t r[256]) {
 
     k += 8;
   }
+  printf("1 = [");
+  for (j = 0; j < 32; j++)
+  {
+    printf("%d, ", r[j]);
+  }
+  printf("]\n");
 
   //   Layer 2
   for (j = 0; j < 256; j += 32) {
@@ -296,6 +304,13 @@ void neon_invntt(int16_t r[256]) {
     vstorex2(&r[j+16], bb);
   }
 
+  printf("2 = [");
+  for (j = 0; j < 32; j++)
+  {
+    printf("%d, ", r[j]);
+  }
+  printf("]\n");
+
   //   Layer 3
   for (j = 0; j < 256; j += 32) {
     //   a - b, c - d
@@ -353,8 +368,16 @@ void neon_invntt(int16_t r[256]) {
     vstorex2(&r[j + 16], bb);
   }
 
+  printf("3 = [");
+  for (j = 0; j < 32; j++)
+  {
+    printf("%d, ", r[j]);
+  }
+  printf("]\n");
+
   // Layer 4, 5, 6, 7
-  for (len = 16; len <= 128; len <<= 1) {
+  for (len = 16; len < 32; len <<= 1) {
+    printf("leb = %d\n", len);
     for (start = 0; start < 256; start = j + len) {
       vdup(neon_zeta1, zetas_inv[k++]);
       for (j = start; j < start + len; j += 16) {
@@ -410,44 +433,53 @@ void neon_invntt(int16_t r[256]) {
     }
   }
 
-  vdup(neon_zeta1, zetas_inv[127]);
-  for (j = 0; j < 256; j += 32) {
-    vloadx4(ab, &r[j]);
-
-    vlo(a_lo, ab.val[0]);
-    vhi(a_hi, ab.val[0]);
-    vlo(b_lo, ab.val[1]);
-    vhi(b_hi, ab.val[1]);
-    vlo(c_lo, ab.val[2]);
-    vhi(c_hi, ab.val[2]);
-    vlo(d_lo, ab.val[3]);
-    vhi(d_hi, ab.val[3]);
-
-    fqmul(a_lo, neon_zeta1, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(b_lo, neon_zeta1, t4, t5, t6, neon_qinv, neon_kyberq);
-    fqmul(c_lo, neon_zeta1, t7, t8, t9, neon_qinv, neon_kyberq);
-    fqmul(d_lo, neon_zeta1, ta, tb, tc, neon_qinv, neon_kyberq);
-    fqmul(a_hi, neon_zeta1, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(b_hi, neon_zeta1, t4, t5, t6, neon_qinv, neon_kyberq);
-    fqmul(c_hi, neon_zeta1, t7, t8, t9, neon_qinv, neon_kyberq);
-    fqmul(d_hi, neon_zeta1, ta, tb, tc, neon_qinv, neon_kyberq);
-
-    vcombine(ab.val[0], a_lo, a_hi);
-    vcombine(ab.val[1], b_lo, b_hi);
-    vcombine(ab.val[2], c_lo, c_hi);
-    vcombine(ab.val[3], d_lo, d_hi);
-
-    vstorex4(&r[j], ab);
+  printf("4 = [");
+  for (j = 0; j < 32; j++)
+  {
+    printf("%d, ", r[j]);
   }
+  printf("]\n");
+
+  // vdup(neon_zeta1, zetas_inv[127]);
+  // for (j = 0; j < 256; j += 32) {
+  //   vloadx4(ab, &r[j]);
+
+  //   vlo(a_lo, ab.val[0]);
+  //   vhi(a_hi, ab.val[0]);
+  //   vlo(b_lo, ab.val[1]);
+  //   vhi(b_hi, ab.val[1]);
+  //   vlo(c_lo, ab.val[2]);
+  //   vhi(c_hi, ab.val[2]);
+  //   vlo(d_lo, ab.val[3]);
+  //   vhi(d_hi, ab.val[3]);
+
+  //   fqmul(a_lo, neon_zeta1, t1, t2, t3, neon_qinv, neon_kyberq);
+  //   fqmul(b_lo, neon_zeta1, t4, t5, t6, neon_qinv, neon_kyberq);
+  //   fqmul(c_lo, neon_zeta1, t7, t8, t9, neon_qinv, neon_kyberq);
+  //   fqmul(d_lo, neon_zeta1, ta, tb, tc, neon_qinv, neon_kyberq);
+  //   fqmul(a_hi, neon_zeta1, t1, t2, t3, neon_qinv, neon_kyberq);
+  //   fqmul(b_hi, neon_zeta1, t4, t5, t6, neon_qinv, neon_kyberq);
+  //   fqmul(c_hi, neon_zeta1, t7, t8, t9, neon_qinv, neon_kyberq);
+  //   fqmul(d_hi, neon_zeta1, ta, tb, tc, neon_qinv, neon_kyberq);
+
+  //   vcombine(ab.val[0], a_lo, a_hi);
+  //   vcombine(ab.val[1], b_lo, b_hi);
+  //   vcombine(ab.val[2], c_lo, c_hi);
+  //   vcombine(ab.val[3], d_lo, d_hi);
+
+  //   vstorex4(&r[j], ab);
+  // }
 }
 
 
 void combined_neon_invntt(int16_t r[256])
 {
-  int j, k1, k2, k3, k4; 
+  int j, k1, k2, k3, k4, k5, k6, k7; 
   // Register
-  int16x8x4_t v;
-  int16x8_t r0, r1, r2, r3, o_tmp, e_tmp,
+  int16x8x4_t v, v1, v2, v3, v4;
+  int16x8_t r0, r1, r2, r3, 
+            l0, l1, l2, l3,
+            o_tmp, e_tmp,
             neon_zetas1, neon_zetas2, 
             neon_zetas3, neon_zetas4;
   int16x4_t a_lo, a_hi, b_lo, b_hi, c_lo, c_hi, d_lo, d_hi;         // 8
@@ -473,15 +505,8 @@ void combined_neon_invntt(int16_t r[256])
   {
     vload(neon_zetas1, &zetas_inv[k1]);
     k1 += 8;
-    vload(neon_zetas2, &zetas_inv[k2]); // EDIT this load 4
-    k2 += 4; 
-    vload(neon_zetas3, &zetas_inv[k3]); // EDIT this load 2
-    k3 += 2; 
-    vload(neon_zetas4, &zetas_inv[k4]); // EDIT this load 1
-    k4 += 1;
 
-
-    // 1st layer 
+    // 1st layer : r0 x r2 | r1 x r3
     // r0: 0, 4, 8,  12 | 16, 20, 24, 28
     // r1: 1, 5, 9,  13 | 17, 21, 25, 29
     // r2: 2, 6, 10, 14 | 18, 22, 26, 30
@@ -503,7 +528,7 @@ void combined_neon_invntt(int16_t r[256])
     // 1 + 3
     vadd8(r1, o_tmp, r3);
     // 1 - 3
-    vsub8(r1, o_tmp, r3);
+    vsub8(r3, o_tmp, r3);
 
     vlo(a_lo, r2);
     vhi(a_hi, r2);
@@ -524,7 +549,159 @@ void combined_neon_invntt(int16_t r[256])
 
     vcombine(r2, a_lo, a_hi);
     vcombine(r3, b_lo, b_hi);
+
+    // Layer 2: r0 x r1 | r2 x r3
+    // Tranpose 4x4 
+    l0 = vtrn1q_s16(r0, r1);
+    l1 = vtrn2q_s16(r0, r1);
+    l2 = vtrn1q_s16(r2, r3);
+    l3 = vtrn2q_s16(r2, r3);
+    r0 = (int16x8_t) vtrn1q_s32( (int32x4_t) l0, (int32x4_t) l2 );
+    r2 = (int16x8_t) vtrn2q_s32( (int32x4_t) l0, (int32x4_t) l2 );
+    r1 = (int16x8_t) vtrn1q_s32( (int32x4_t) l1, (int32x4_t) l3 );
+    r3 = (int16x8_t) vtrn2q_s32( (int32x4_t) l1, (int32x4_t) l3 );
+    
+    // r0: 0,  1,  2,  3  | 16,  17,  18,  19
+    // r1: 4,  5,  6,  7  | 20,  21,  22,  23
+    // r2: 8,  9,  10, 11 | 24,  25,  26,  27
+    // r3: 12, 13, 14, 15 | 28,  29,  30,  31
+
+    e_tmp = r0;
+    // 0 + 4
+    vadd8(r0, e_tmp, r1);
+    // 0 - 4
+    vsub8(r1, e_tmp, r1);
+
+    o_tmp = r2; 
+    // 8 + 12 
+    vadd8(r2, o_tmp, r3);
+    // 8 - 12 
+    vsub8(r3, o_tmp, r3);
+
+    vlo(a_lo, r1);
+    vlo(b_lo, r3);
+
+    vhi(a_hi, r1);
+    vhi(b_hi, r3);
+
+    vdup(zlo, zetas_inv[k2++]);
+    fqmul(a_lo, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
+
+    vdup(zlo, zetas_inv[k2++]);
+    fqmul(b_lo, zlo, t4, t5, t6, neon_qinv, neon_kyberq);
+    
+    vdup(zhi, zetas_inv[k2++]);
+    fqmul(a_hi, zhi, t7, t8, t9, neon_qinv, neon_kyberq);
+    
+    vdup(zhi, zetas_inv[k2++]);
+    fqmul(b_hi, zhi, ta, tb, tc, neon_qinv, neon_kyberq);
+
+    barrett(r0, e_tmp, c_lo, c_hi, t1, t2, neon_v, neon_kyberq16);
+    barrett(r2, o_tmp, d_lo, d_hi, t3, t4, neon_v, neon_kyberq16);
+
+    vcombine(r1, a_lo, a_hi);
+    vcombine(r3, b_lo, b_hi);
+
+    // Layer 3 : r0 x r2 | r1 x r3
+    // r0: 0,  1,  2,  3  | 16,  17,  18,  19
+    // r1: 4,  5,  6,  7  | 20,  21,  22,  23
+    // r2: 8,  9,  10, 11 | 24,  25,  26,  27
+    // r3: 12, 13, 14, 15 | 28,  29,  30,  31
+
+    e_tmp = r0;
+    // 0 + 8  
+    vadd8(r0, e_tmp, r2);
+    // 0 - 8
+    vsub8(r2, e_tmp, r2);
+
+    o_tmp = r1;
+    // 4 + 12
+    vadd8(r1, o_tmp, r3);
+    // 4 - 12
+    vsub8(r3, o_tmp, r3);
+
+    vlo(a_lo, r2);
+    vhi(a_hi, r2);
+
+    vlo(b_lo, r3);
+    vhi(b_hi, r3);
+
+    vdup(zlo, zetas_inv[k3++]);
+    vdup(zhi, zetas_inv[k3++]);
+
+    fqmul(a_lo, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
+    fqmul(a_hi, zhi, t7, t8, t9, neon_qinv, neon_kyberq);
+    fqmul(b_lo, zlo, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(b_hi, zhi, ta, tb, tc, neon_qinv, neon_kyberq);
+
+    barrett(r0, e_tmp, c_lo, c_hi, t1, t2, neon_v, neon_kyberq16);
+    barrett(r1, o_tmp, d_lo, d_hi, t3, t4, neon_v, neon_kyberq16);
+
+    vcombine(r2, a_lo, a_hi);
+    vcombine(r3, b_lo, b_hi);
+
+    // Layer 4: r0 x r1 | r2 x r3
+    // Re-arrange vector 
+    l0 = (int16x8_t) vtrn1q_s64( (int64x2_t) r0, (int64x2_t) r1);
+    l1 = (int16x8_t) vtrn2q_s64( (int64x2_t) r0, (int64x2_t) r1);
+    l2 = (int16x8_t) vtrn1q_s64( (int64x2_t) r2, (int64x2_t) r3);
+    l3 = (int16x8_t) vtrn2q_s64( (int64x2_t) r2, (int64x2_t) r3);
+
+    // l0: 0,  1,  2,  3  | 4,  5,  6,  7  
+    // l1: 16, 17, 18, 19 | 20, 21, 22, 23
+    // l2: 8,  9,  10, 11 | 12, 13, 14, 15 
+    // l3: 24, 25, 26, 27 | 28, 29, 30, 31
+
+    e_tmp = l0;
+    // 0 + 16
+    vadd8(l0, e_tmp, l1);
+    // 0 - 16
+    vsub8(l1, e_tmp, l1);
+
+    o_tmp = l2; 
+    // 8 + 24
+    vadd8(l2, o_tmp, l3);
+    // 8 - 24 
+    vsub8(l3, o_tmp, l3);
+
+    vlo(a_lo, l1);
+    vhi(a_hi, l1);
+
+    vlo(b_lo, l3);
+    vhi(b_hi, l3);
+
+    vdup(zhi, zetas_inv[k4++]);
+    zlo = zhi;
+
+    fqmul(a_lo, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
+    fqmul(a_hi, zhi, t7, t8, t9, neon_qinv, neon_kyberq);
+    fqmul(b_lo, zlo, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(b_hi, zhi, ta, tb, tc, neon_qinv, neon_kyberq);
+
+    barrett(l0, e_tmp, c_lo, c_hi, t1, t2, neon_v, neon_kyberq16);
+    barrett(l2, o_tmp, d_lo, d_hi, t3, t4, neon_v, neon_kyberq16);
+
+    vcombine(l1, a_lo, a_hi);
+    vcombine(l3, b_lo, b_hi);
+
+    v.val[0] = l0;
+    v.val[1] = l2;
+    v.val[2] = l1;
+    v.val[3] = l3;
+
+    vstorex4(&r[j], v);
   }
+
+  // // Layer 5, 6
+  // k5 = k4;
+  // for (j = 0; j < 256; j+=128)
+  // {
+    
+  // }
+
+  // Layer 7, inv_mul 
+
+
 }
 
 
@@ -752,7 +929,8 @@ void neon_ntt(int16_t r[256]) {
   }
 }
 
-int compare(int *a, int *b, int length)
+
+int compare(int16_t *a, int16_t *b, int length)
 {
   int i, j, count = 0;
   for (i = 0; i < length; i+=8)
@@ -776,7 +954,7 @@ int compare(int *a, int *b, int length)
 int main(void)
 {
   int16_t r_gold[256], r[256];
-  int i, t; 
+  int16_t i, t; 
   for (i  = 0; i < 256; i++)
   {
     t = i; 
