@@ -379,6 +379,7 @@ void neon_invntt(int16_t r[256]) {
   for (len = 16; len <= 64; len <<= 1) {
     printf("len = %d\n", len);
     for (start = 0; start < 256; start = j + len) {
+      printf("zetas_inv: %d :%d\n", k, zetas_inv[k]);
       vdup(neon_zeta1, zetas_inv[k++]);
       for (j = start; j < start + len; j += 16) {
         //   a - c, b - d
@@ -723,36 +724,15 @@ void combined_neon_invntt(int16_t r[256])
     vadd8(v0.val[2], v.val[2], v1.val[2]);
     vadd8(v0.val[3], v.val[3], v1.val[3]);
     // 0 - 32 
-    vadd8(v1.val[0], v.val[0], v1.val[0]);
-    vadd8(v1.val[1], v.val[1], v1.val[1]);
-    vadd8(v1.val[2], v.val[2], v1.val[2]);
-    vadd8(v1.val[3], v.val[3], v1.val[3]);
-
-    v.val[0] = v2.val[0];
-    v.val[1] = v2.val[1];
-    v.val[2] = v2.val[2];
-    v.val[3] = v2.val[3];
-
-    // 64 + 96
-    vadd8(v2.val[0], v.val[0], v3.val[0]);
-    vadd8(v2.val[1], v.val[1], v3.val[1]);
-    vadd8(v2.val[2], v.val[2], v3.val[2]);
-    vadd8(v2.val[3], v.val[3], v3.val[3]);
-    // 64 - 96
-    vadd8(v3.val[0], v.val[0], v3.val[0]);
-    vadd8(v3.val[1], v.val[1], v3.val[1]);
-    vadd8(v3.val[2], v.val[2], v3.val[2]);
-    vadd8(v3.val[3], v.val[3], v3.val[3]);
+    vsub8(v1.val[0], v.val[0], v1.val[0]);
+    vsub8(v1.val[1], v.val[1], v1.val[1]);
+    vsub8(v1.val[2], v.val[2], v1.val[2]);
+    vsub8(v1.val[3], v.val[3], v1.val[3]);
 
     barrett(v0.val[0], e_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
     barrett(v0.val[1], e_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
     barrett(v0.val[2], e_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
     barrett(v0.val[3], e_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
-
-    barrett(v2.val[0], e_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
-    barrett(v2.val[1], e_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
-    barrett(v2.val[2], e_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
-    barrett(v2.val[3], e_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
 
     // 
     vdup(zlo, zetas_inv[k5++]);
@@ -782,6 +762,27 @@ void combined_neon_invntt(int16_t r[256])
 
     vcombine(v1.val[2], a_lo, a_hi);
     vcombine(v1.val[3], b_lo, b_hi);
+
+    v.val[0] = v2.val[0];
+    v.val[1] = v2.val[1];
+    v.val[2] = v2.val[2];
+    v.val[3] = v2.val[3];
+
+    // // 64 + 96
+    vadd8(v2.val[0], v.val[0], v3.val[0]);
+    vadd8(v2.val[1], v.val[1], v3.val[1]);
+    vadd8(v2.val[2], v.val[2], v3.val[2]);
+    vadd8(v2.val[3], v.val[3], v3.val[3]);
+    // 64 - 96
+    vsub8(v3.val[0], v.val[0], v3.val[0]);
+    vsub8(v3.val[1], v.val[1], v3.val[1]);
+    vsub8(v3.val[2], v.val[2], v3.val[2]);
+    vsub8(v3.val[3], v.val[3], v3.val[3]);
+
+    barrett(v2.val[0], e_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
+    barrett(v2.val[1], e_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
+    barrett(v2.val[2], e_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
+    barrett(v2.val[3], e_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
 
     // 
     vdup(zhi, zetas_inv[k5++]);
@@ -817,10 +818,6 @@ void combined_neon_invntt(int16_t r[256])
     // v2: 64 -> 95
     // v1: 32 -> 63
     // v3: 96 -> 127
-    vloadx4(v0, &r[j+ 0]);
-    vloadx4(v1, &r[j+32]);
-    vloadx4(v2, &r[j+64]);
-    vloadx4(v3, &r[j+96]);
 
     v.val[0] = v0.val[0];
     v.val[1] = v0.val[1];
@@ -833,10 +830,10 @@ void combined_neon_invntt(int16_t r[256])
     vadd8(v0.val[2], v.val[2], v2.val[2]);
     vadd8(v0.val[3], v.val[3], v2.val[3]);
     // 0 - 64
-    vadd8(v2.val[0], v.val[0], v2.val[0]);
-    vadd8(v2.val[1], v.val[1], v2.val[1]);
-    vadd8(v2.val[2], v.val[2], v2.val[2]);
-    vadd8(v2.val[3], v.val[3], v2.val[3]);
+    vsub8(v2.val[0], v.val[0], v2.val[0]);
+    vsub8(v2.val[1], v.val[1], v2.val[1]);
+    vsub8(v2.val[2], v.val[2], v2.val[2]);
+    vsub8(v2.val[3], v.val[3], v2.val[3]);
 
     v.val[0] = v1.val[0];
     v.val[1] = v1.val[1];
@@ -849,10 +846,10 @@ void combined_neon_invntt(int16_t r[256])
     vadd8(v1.val[2], v.val[2], v3.val[2]);
     vadd8(v1.val[3], v.val[3], v3.val[3]);
     // 32 - 96
-    vadd8(v3.val[0], v.val[0], v3.val[0]);
-    vadd8(v3.val[1], v.val[1], v3.val[1]);
-    vadd8(v3.val[2], v.val[2], v3.val[2]);
-    vadd8(v3.val[3], v.val[3], v3.val[3]);
+    vsub8(v3.val[0], v.val[0], v3.val[0]);
+    vsub8(v3.val[1], v.val[1], v3.val[1]);
+    vsub8(v3.val[2], v.val[2], v3.val[2]);
+    vsub8(v3.val[3], v.val[3], v3.val[3]);
 
     barrett(v0.val[0], e_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
     barrett(v0.val[1], e_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
@@ -1170,7 +1167,7 @@ int compare(int16_t *a, int16_t *b, int length)
     {
       if (a[j] != b[j])
       {
-        printf("%d: %d != %d\n", i, a[j], b[j]);
+        printf("%d: %d != %d\n", j, a[j], b[j]);
         count++;
       }
       if (count > 8) 
@@ -1194,6 +1191,7 @@ int main(void)
   }
 
   neon_invntt(r_gold);
+  printf("\n\n\n");
   combined_neon_invntt(r);
 
   if (compare(r_gold, r, 256))
