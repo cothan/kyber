@@ -87,12 +87,12 @@ int16_t fqmul(int16_t b, int16_t c) {
   return t;
 }
 **************************************************/
-#define fqmul(inout, zeta, t, a, u, neon_qinv, neon_kyberq)                    \
-  a = vmull_s16(inout, zeta);                                                  \
-  u = vmulq_s32(a, neon_qinv);                                                 \
-  u = vshrq_n_s32(u, 16);                                                      \
-  t = vmlaq_s32(a, neon_kyberq, u);                                            \
-  t = vshrq_n_s32(t, 16);                                                      \
+#define fqmul(inout, zeta, a, u, t, neon_qinv, neon_kyberq) \
+  a = vmull_s16(inout, zeta);                               \
+  u = vmulq_s32(a, neon_qinv);                              \
+  u = vshrq_n_s32(u, 16);                                   \
+  t = vmlaq_s32(a, neon_kyberq, u);                         \
+  t = vshrq_n_s32(t, 16);                                   \
   inout = vmovn_s32(t);
 
 /*
@@ -701,6 +701,7 @@ void combined_neon_invntt(int16_t r[256])
   int16x8x4_t v0, v1, v2, v3;
 
   // Layer 5, 6
+  // Total register: 5x4 + 4(const) + 2(zlo, zhi) + 4(ab_hi, lo) + 2(t1-t6) = 32
   for (j = 0; j < 256; j+=128)
   {
     // Layer 5: v0 x v1 | v2 x v3 
@@ -729,40 +730,6 @@ void combined_neon_invntt(int16_t r[256])
     vsub8(v1.val[2], v.val[2], v1.val[2]);
     vsub8(v1.val[3], v.val[3], v1.val[3]);
 
-    barrett(v0.val[0], e_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
-    barrett(v0.val[1], e_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
-    barrett(v0.val[2], e_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
-    barrett(v0.val[3], e_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
-
-    // 
-    vdup(zlo, zetas_inv[k5++]);
-
-    vlo(a_lo, v1.val[0]);
-    vhi(a_hi, v1.val[0]);
-    vlo(b_lo, v1.val[1]);
-    vhi(b_hi, v1.val[1]);
-
-    fqmul(a_lo, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(a_hi, zlo, t4, t5, t6, neon_qinv, neon_kyberq);
-    fqmul(b_lo, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(b_hi, zlo, t4, t5, t6, neon_qinv, neon_kyberq);
-
-    vcombine(v1.val[0], a_lo, a_hi);
-    vcombine(v1.val[1], b_lo, b_hi);
-
-    vlo(a_lo, v1.val[2]);
-    vhi(a_hi, v1.val[2]);
-    vlo(b_lo, v1.val[3]);
-    vhi(b_hi, v1.val[3]);
-
-    fqmul(a_lo, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(a_hi, zlo, t4, t5, t6, neon_qinv, neon_kyberq);
-    fqmul(b_lo, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(b_hi, zlo, t4, t5, t6, neon_qinv, neon_kyberq);
-
-    vcombine(v1.val[2], a_lo, a_hi);
-    vcombine(v1.val[3], b_lo, b_hi);
-
     v.val[0] = v2.val[0];
     v.val[1] = v2.val[1];
     v.val[2] = v2.val[2];
@@ -779,10 +746,44 @@ void combined_neon_invntt(int16_t r[256])
     vsub8(v3.val[2], v.val[2], v3.val[2]);
     vsub8(v3.val[3], v.val[3], v3.val[3]);
 
-    barrett(v2.val[0], e_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
-    barrett(v2.val[1], e_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
-    barrett(v2.val[2], e_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
-    barrett(v2.val[3], e_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
+    barrett(v0.val[0], v.val[0], zlo, zhi, t1, t2, neon_v, neon_kyberq16);
+    barrett(v0.val[1], v.val[1], zlo, zhi, t3, t1, neon_v, neon_kyberq16);
+    barrett(v0.val[2], v.val[2], zlo, zhi, t2, t3, neon_v, neon_kyberq16);
+    barrett(v0.val[3], v.val[3], zlo, zhi, t1, t2, neon_v, neon_kyberq16);
+
+    barrett(v2.val[0], v.val[0], zlo, zhi, t3, t1, neon_v, neon_kyberq16);
+    barrett(v2.val[1], v.val[1], zlo, zhi, t2, t3, neon_v, neon_kyberq16);
+    barrett(v2.val[2], v.val[2], zlo, zhi, t1, t2, neon_v, neon_kyberq16);
+    barrett(v2.val[3], v.val[3], zlo, zhi, t3, t1, neon_v, neon_kyberq16);
+
+    // 
+    vdup(zlo, zetas_inv[k5++]);
+
+    vlo(a_lo, v1.val[0]);
+    vhi(a_hi, v1.val[0]);
+    vlo(b_lo, v1.val[1]);
+    vhi(b_hi, v1.val[1]);
+
+    fqmul(a_lo, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
+    fqmul(a_hi, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
+    fqmul(b_lo, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
+    fqmul(b_hi, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
+
+    vcombine(v1.val[0], a_lo, a_hi);
+    vcombine(v1.val[1], b_lo, b_hi);
+
+    vlo(a_lo, v1.val[2]);
+    vhi(a_hi, v1.val[2]);
+    vlo(b_lo, v1.val[3]);
+    vhi(b_hi, v1.val[3]);
+
+    fqmul(a_lo, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
+    fqmul(a_hi, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
+    fqmul(b_lo, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
+    fqmul(b_hi, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
+
+    vcombine(v1.val[2], a_lo, a_hi);
+    vcombine(v1.val[3], b_lo, b_hi);
 
     // 
     vdup(zhi, zetas_inv[k5++]);
@@ -793,9 +794,9 @@ void combined_neon_invntt(int16_t r[256])
     vhi(b_hi, v3.val[1]);
 
     fqmul(a_lo, zhi, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(a_hi, zhi, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(a_hi, zhi, t1, t2, t3, neon_qinv, neon_kyberq);
     fqmul(b_lo, zhi, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(b_hi, zhi, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(b_hi, zhi, t1, t2, t3, neon_qinv, neon_kyberq);
 
     vcombine(v3.val[0], a_lo, a_hi);
     vcombine(v3.val[1], b_lo, b_hi);
@@ -806,9 +807,9 @@ void combined_neon_invntt(int16_t r[256])
     vhi(b_hi, v3.val[3]);
 
     fqmul(a_lo, zhi, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(a_hi, zhi, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(a_hi, zhi, t1, t2, t3, neon_qinv, neon_kyberq);
     fqmul(b_lo, zhi, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(b_hi, zhi, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(b_hi, zhi, t1, t2, t3, neon_qinv, neon_kyberq);
 
     vcombine(v3.val[2], a_lo, a_hi);
     vcombine(v3.val[3], b_lo, b_hi);
@@ -851,15 +852,21 @@ void combined_neon_invntt(int16_t r[256])
     vsub8(v3.val[2], v.val[2], v3.val[2]);
     vsub8(v3.val[3], v.val[3], v3.val[3]);
 
-    barrett(v0.val[0], e_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
-    barrett(v0.val[1], e_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
-    barrett(v0.val[2], e_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
-    barrett(v0.val[3], e_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
+    barrett(v0.val[0], v.val[0], zlo, zhi, t1, t2, neon_v, neon_kyberq16);
+    barrett(v0.val[1], v.val[1], zlo, zhi, t1, t2, neon_v, neon_kyberq16);
+    barrett(v0.val[2], v.val[2], zlo, zhi, t1, t2, neon_v, neon_kyberq16);
+    barrett(v0.val[3], v.val[3], zlo, zhi, t1, t2, neon_v, neon_kyberq16);
 
-    barrett(v1.val[0], o_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
-    barrett(v1.val[1], o_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
-    barrett(v1.val[2], o_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
-    barrett(v1.val[3], o_tmp, zlo, zhi, t1, t2, neon_v, neon_kyberq16);
+    vstorex4(&r[j+ 0], v0);
+
+    barrett(v1.val[0], v.val[0], zlo, zhi, t1, t2, neon_v, neon_kyberq16);
+    barrett(v1.val[1], v.val[1], zlo, zhi, t1, t2, neon_v, neon_kyberq16);
+    barrett(v1.val[2], v.val[2], zlo, zhi, t1, t2, neon_v, neon_kyberq16);
+    barrett(v1.val[3], v.val[3], zlo, zhi, t1, t2, neon_v, neon_kyberq16);
+
+    vstorex4(&r[j+32], v1);
+
+    // Reduce register usage afterwards
 
     vdup(zlo, zetas_inv[k6++]);
 
@@ -869,9 +876,9 @@ void combined_neon_invntt(int16_t r[256])
     vhi(b_hi, v2.val[1]);
 
     fqmul(a_lo, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(a_hi, zlo, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(a_hi, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
     fqmul(b_lo, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(b_hi, zlo, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(b_hi, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
 
     vcombine(v2.val[0], a_lo, a_hi);
     vcombine(v2.val[1], b_lo, b_hi);
@@ -882,12 +889,14 @@ void combined_neon_invntt(int16_t r[256])
     vhi(b_hi, v2.val[3]);
 
     fqmul(a_lo, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(a_hi, zlo, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(a_hi, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
     fqmul(b_lo, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(b_hi, zlo, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(b_hi, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
 
     vcombine(v2.val[2], a_lo, a_hi);
     vcombine(v2.val[3], b_lo, b_hi);
+
+    vstorex4(&r[j+64], v2);
 
     //  
     vlo(a_lo, v3.val[0]);
@@ -896,9 +905,9 @@ void combined_neon_invntt(int16_t r[256])
     vhi(b_hi, v3.val[1]);
 
     fqmul(a_lo, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(a_hi, zlo, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(a_hi, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
     fqmul(b_lo, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(b_hi, zlo, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(b_hi, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
 
     vcombine(v3.val[0], a_lo, a_hi);
     vcombine(v3.val[1], b_lo, b_hi);
@@ -909,16 +918,13 @@ void combined_neon_invntt(int16_t r[256])
     vhi(b_hi, v3.val[3]);
 
     fqmul(a_lo, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(a_hi, zlo, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(a_hi, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
     fqmul(b_lo, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(b_hi, zlo, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(b_hi, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
 
     vcombine(v3.val[2], a_lo, a_hi);
     vcombine(v3.val[3], b_lo, b_hi);
-
-    vstorex4(&r[j+ 0], v0);
-    vstorex4(&r[j+32], v1);
-    vstorex4(&r[j+64], v2);
+    
     vstorex4(&r[j+96], v3);
   }
 
