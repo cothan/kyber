@@ -1158,6 +1158,13 @@ void neon_ntt(int16_t r[256])
     }
   }
 
+  printf("\n4 = [");
+  for (j = 0; j < 32; j++)
+  {
+    printf("%d, ", r[j]);
+  }
+  printf("]\n");
+
   //   Layer 3
   for (j = 0; j < 256; j += 32)
   {
@@ -1200,6 +1207,14 @@ void neon_ntt(int16_t r[256])
     ab.val[3] = d;
     vstorex4(&r[j], ab);
   }
+
+  printf("\n3 = [");
+  for (j = 0; j < 32; j++)
+  {
+    printf("%d, ", r[j]);
+  }
+  printf("]\n");
+
 
   // Layer 2
   for (j = 0; j < 256; j += 32)
@@ -1267,6 +1282,13 @@ void neon_ntt(int16_t r[256])
     vstorex4(&r[j], ab);
   }
 
+  printf("\n2 = [");
+  for (j = 0; j < 32; j++)
+  {
+    printf("%d, ", r[j]);
+  }
+  printf("]\n");
+
   //   Layer 1
   for (j = 0; j < 256; j += 32)
   {
@@ -1310,6 +1332,12 @@ void neon_ntt(int16_t r[256])
     //
     vstore4(&r[j], ab);
   }
+  printf("\n1 = [");
+  for (j = 0; j < 32; j++)
+  {
+    printf("%d, ", r[j]);
+  }
+  printf("]\n");
 }
 
 void combined_neon_ntt(int16_t r[256])
@@ -1623,10 +1651,10 @@ void combined_neon_ntt(int16_t r[256])
   {
     vloadx4(v, &r[j]);
 
-    v.val[0] = r0;
-    v.val[1] = r1;
-    v.val[2] = r2;
-    v.val[3] = r3;
+    r0 = v.val[0];
+    r1 = v.val[1];
+    r2 = v.val[2];
+    r3 = v.val[3];
 
     // Layer 4: r0 x r2 | r1 x r3
     // r0: 0  -> 7
@@ -1671,8 +1699,8 @@ void combined_neon_ntt(int16_t r[256])
     vhi(b_hi, r3);
 
     fqmul(a_lo, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(a_hi, zlo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(b_lo, zhi, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(a_hi, zlo, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(b_lo, zhi, t1, t2, t3, neon_qinv, neon_kyberq);
     fqmul(b_hi, zhi, t4, t5, t6, neon_qinv, neon_kyberq);
 
     vcombine(l1, a_lo, a_hi);
@@ -1682,7 +1710,7 @@ void combined_neon_ntt(int16_t r[256])
     vadd8(r0, r0, l1);
 
     vsub8(r3, r2, l3);
-    vadd8(r1, r2, l3);
+    vadd8(r2, r2, l3);
 
     // Layer 2: l0 x l1   | l2 x l3 
     // r0: 0,  1,  2,  3  | 4,  5,  6,  7
@@ -1724,13 +1752,13 @@ void combined_neon_ntt(int16_t r[256])
     vadd8(r0, l0, l1);
 
     vsub8(r3, l2, l3);
-    vadd8(r1, l2, l3);
+    vadd8(r2, l2, l3);
 
     // Layer 1: r0 x r2 | r1 x r3 
-    // l0: 0,  1,  2,  3  | 16, 17, 18, 19
-    // l1: 4,  5,  6,  7  | 20, 21, 22, 23
-    // l2: 8,  9,  10, 11 | 24, 25, 26, 27
-    // l3: 12, 13, 14, 15 | 28, 29, 30, 31
+    // r0: 0,  1,  2,  3  | 16, 17, 18, 19
+    // r1: 4,  5,  6,  7  | 20, 21, 22, 23
+    // r2: 8,  9,  10, 11 | 24, 25, 26, 27
+    // r3: 12, 13, 14, 15 | 28, 29, 30, 31
     // Tranpose 4x4
     l0 = vtrn1q_s16(r0, r1);
     l1 = vtrn2q_s16(r0, r1);
@@ -1762,14 +1790,14 @@ void combined_neon_ntt(int16_t r[256])
     fqmul(a_hi, zhi, t1, t2, t3, neon_qinv, neon_kyberq);
     fqmul(b_hi, zhi, t4, t5, t6, neon_qinv, neon_kyberq);
 
-    vcombine(r1, a_lo, a_hi);
-    vcombine(r3, b_lo, b_hi);
+    vcombine(l2, a_lo, a_hi);
+    vcombine(l3, b_lo, b_hi);
 
-    vsub8(r1, r0, r1);
-    vadd8(r0, r0, r1);
+    vsub8(r2, r0, l2);
+    vadd8(r0, r0, l2);
 
-    vsub8(r3, r2, r3);
-    vadd8(r1, r2, r3);
+    vsub8(r3, r1, l3);
+    vadd8(r1, r1, l3);
 
     v.val[0] = r0;
     v.val[1] = r1;
@@ -1778,6 +1806,12 @@ void combined_neon_ntt(int16_t r[256])
 
     vstore4(&r[j], v);
   }
+  printf("\n1 = [");
+  for (j = 0; j < 32; j++)
+  {
+    printf("%d, ", r[j]);
+  }
+  printf("]\n");
 
 }
 
@@ -1785,7 +1819,7 @@ void combined_neon_ntt(int16_t r[256])
 #include <papi.h>
 #include <stdio.h>
 
-#define TESTS 100
+#define TESTS 1
 
 int compare(int16_t *a, int16_t *b, int length)
 {
