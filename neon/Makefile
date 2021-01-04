@@ -33,6 +33,7 @@ all: \
   test_speedusec512 \
   test_speedusec768 \
   test_speedusec1024 \
+  test_speed_ntt \
   test_kyber512-90s \
   test_kyber768-90s \
   test_kyber1024-90s \
@@ -60,7 +61,8 @@ speed_keccak: \
 speedcycles: \
   test_speed512 \
   test_speed768 \
-  test_speed1024
+  test_speed1024 \
+  test_speed_ntt
 
 shared: \
   libpqcrystals_kyber512_neon.so \
@@ -140,6 +142,9 @@ test_speedusec768: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c spe
 
 test_speedusec1024: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed_usec.c randombytes.c kex.c kex.h
 	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c cpucycles.c speed_print.c kex.c test_speed_usec.c -o test_speedusec1024
+
+test_speed_ntt: ntt.c reduce.c neon_ntt.c speed_ntt.c
+	$(CC) $(CFLAGS) ntt.c reduce.c neon_ntt.c speed_ntt.c -o test_speed_ntt
 
 libpqcrystals_kyber512-90s_neon.so: $(SOURCES) $(HEADERS) symmetric-aes.c
 	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=2 -DKYBER_90S $(SOURCES) symmetric-aes.c -o libpqcrystals_kyber512-90s_neon.so
@@ -232,6 +237,7 @@ benchcycles:
 	./test_speed512
 	./test_speed768
 	./test_speed1024
+	./test_speed_ntt
 
 bench_keccak: 
 	taskset 0x1 ./test_speed512keccak

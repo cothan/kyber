@@ -751,7 +751,7 @@ int main(void)
     invntt(r_gold);
   }
   end = PAPI_get_real_cyc() - start;
-  printf("C INTT layers: %lf\n", (double) end/TESTS);
+  printf("C 8 INTT layers: %lf\n", (double) end/TESTS);
 
   start = PAPI_get_real_cyc();
   for (int j = 0; j < TESTS; j++)
@@ -759,7 +759,7 @@ int main(void)
     neon_invntt(r1);
   }
   end = PAPI_get_real_cyc() - start;
-  printf("Merged INTT layers: %lf\n", (double) end/TESTS);
+  printf("Merged 8 INTT layers: %lf\n", (double) end/TESTS);
 
   start = PAPI_get_real_cyc();
   for (int j = 0; j < TESTS; j++)
@@ -767,7 +767,7 @@ int main(void)
     unroll_neon_invntt(r2);
   }
   end = PAPI_get_real_cyc() - start;
-  printf("Unroll INTT layers: %lf\n", (double) end/TESTS);
+  printf("Unroll 8 INTT layers: %lf\n", (double) end/TESTS);
 
 
   // Test NTT
@@ -777,7 +777,7 @@ int main(void)
     ntt(r_gold);
   }
   end = PAPI_get_real_cyc() - start;
-  printf("C NTT layers: %lf\n", (double) end/TESTS);
+  printf("C 8 NTT layers: %lf\n", (double) end/TESTS);
 
   start = PAPI_get_real_cyc();
   for (int j = 0; j < TESTS; j++)
@@ -785,7 +785,7 @@ int main(void)
     neon_ntt(r1);
   }
   end = PAPI_get_real_cyc() - start;
-  printf("Merged NTT layers: %lf\n", (double) end/TESTS);
+  printf("Merged 8 NTT layers: %lf\n", (double) end/TESTS);
 
   start = PAPI_get_real_cyc();
   for (int j = 0; j < TESTS; j++)
@@ -793,7 +793,7 @@ int main(void)
     unroll_neon_ntt(r2);
   }
   end = PAPI_get_real_cyc() - start;
-  printf("Unroll NTT layers: %lf\n", (double) end/TESTS);
+  printf("Unroll 8 NTT layers: %lf\n", (double) end/TESTS);
 
   if (compare(r_gold, r1, 256) && compare(r_gold, r2, 256))
     return 1;
