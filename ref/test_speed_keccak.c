@@ -48,67 +48,89 @@ int main()
     printf("NTESTS: %d\n", NTESTS);
     long_long start, end;
 
-    start = cpucycles();
+    //start = cpucycles();
     for (i = 0; i < NTESTS; i++)
     {
         // t[i] = cpucycles();
+        PAPI_hl_region_begin("gen_matrix");  
         gen_matrix(matrix, seed, 0);
+        PAPI_hl_region_end("gen_matrix");
+        
     }
-    end = cpucycles() - start;
-    printf("gen_a: %lf\n", (double) end/NTESTS);
+    //end = cpucycles() - start;
+    //printf("gen_a: %lf\n", (double) end/NTESTS);
 
-    start = cpucycles();
+    //start = cpucycles();
     for (i = 0; i < NTESTS; i++)
     {
         // t[i] = cpucycles();
+        PAPI_hl_region_begin("eta1");  
+        
         poly_getnoise_eta1(&ap, seed, 1);
         poly_getnoise_eta1(&bp, seed, 0);
+      
+        PAPI_hl_region_end("eta1");
     }
-    end = cpucycles() - start;
-    printf("poly_getnoise_eta1: %lf\n", (double) end/NTESTS);
+    //end = cpucycles() - start;
+    //printf("poly_getnoise_eta1: %lf\n", (double) end/NTESTS);
 
-    start = cpucycles();
+    //start = cpucycles();
     for (i = 0; i < NTESTS; i++)
     {
         // t[i] = cpucycles();
+        PAPI_hl_region_begin("eta2");  
+        
         poly_getnoise_eta2(&ap, seed, 0);
         poly_getnoise_eta2(&bp, seed, 1);
+        PAPI_hl_region_end("eta2");
     }
-    end = cpucycles() - start;
-    printf("poly_getnoise_eta2: %lf\n", (double) end/NTESTS);
+    //end = cpucycles() - start;
+    //printf("poly_getnoise_eta2: %lf\n", (double) end/NTESTS);
 
-    start = cpucycles();
+    //start = cpucycles();
     for (i = 0; i < NTESTS; i++)
     {
         // t[i] = cpucycles();
+        PAPI_hl_region_begin("prf");  
+        
         prf(buf1eta1, sizeof(buf1eta1), seed, 0);
         prf(buf2eta1, sizeof(buf2eta1), seed, 0);
+        
+        PAPI_hl_region_end("prf");
     }
-    end = cpucycles() - start;
-    printf("prf: %d->%d: %lf\n", 32,  sizeof(buf1eta1), (double) end/NTESTS);
+    //end = cpucycles() - start;
+    //printf("prf: %d->%d: %lf\n", 32,  sizeof(buf1eta1), (double) end/NTESTS);
 
-    start = cpucycles();
+    //start = cpucycles();
     for (i = 0; i < NTESTS; i++)
     {
         // t[i] = cpucycles();
+        PAPI_hl_region_begin("prf2");  
+        
         prf(buf1eta2, sizeof(buf1eta2), seed, 0);
         prf(buf2eta2, sizeof(buf2eta2), seed, 0);
+        
+        PAPI_hl_region_end("prf2");
     }
-    end = cpucycles() - start;
-    printf("prf: %d->%d: %lf\n",32, sizeof(buf2eta2), (double) end/NTESTS);
+    //end = cpucycles() - start;
+    //printf("prf: %d->%d: %lf\n",32, sizeof(buf2eta2), (double) end/NTESTS);
 
 
-    start = cpucycles();
+    // start = cpucycles();
     for (i = 0; i < NTESTS; i++)
     {
         // t[i] = cpucycles();
+        PAPI_hl_region_begin("abs");  
+        
         kyber_shake128_absorb(&state1, seed, 0, 1);
         kyber_shake128_absorb(&state2, seed, 0, 1);
         xof_squeezeblocks(buf0, GEN_MATRIX_NBLOCKS, &state1);
         xof_squeezeblocks(buf1, GEN_MATRIX_NBLOCKS, &state2);
+        
+        PAPI_hl_region_end("abs");
     }
-    end = cpucycles() - start;
-    printf("SHAKE128 ABS SQZ: %d->%d: %lf\n", 32, sizeof(buf1), (double) end/NTESTS);
+    //end = cpucycles() - start;
+    //printf("SHAKE128 ABS SQZ: %d->%d: %lf\n", 32, sizeof(buf1), (double) end/NTESTS);
 
 
     return 0;

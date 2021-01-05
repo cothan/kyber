@@ -739,61 +739,57 @@ int main(void)
 {
   int16_t r_gold[256], r1[256], r2[256];
   long_long start, end;
+  int retval;
 
   getrandom(r_gold, sizeof(r_gold), 0);
   memcpy(r1, r_gold, sizeof(r_gold));
   memcpy(r2, r_gold, sizeof(r_gold));
 
   // Test INTT
-  start = PAPI_get_real_cyc();
   for (int j = 0; j < TESTS; j++)
   {
+  retval = PAPI_hl_region_begin("c_invntt");
     invntt(r_gold);
+  retval = PAPI_hl_region_end("c_invntt");
   }
-  end = PAPI_get_real_cyc() - start;
-  printf("C 8 INTT layers: %lf\n", (double) end/TESTS);
 
-  start = PAPI_get_real_cyc();
   for (int j = 0; j < TESTS; j++)
   {
+  retval = PAPI_hl_region_begin("merged_neon_invntt");
     neon_invntt(r1);
+  retval = PAPI_hl_region_end("merged_neon_invntt");
   }
-  end = PAPI_get_real_cyc() - start;
-  printf("Merged 8 INTT layers: %lf\n", (double) end/TESTS);
-
-  start = PAPI_get_real_cyc();
+  
   for (int j = 0; j < TESTS; j++)
   {
+  retval = PAPI_hl_region_begin("unroll_neon_invntt");
     unroll_neon_invntt(r2);
+  retval = PAPI_hl_region_end("unroll_neon_invntt");
   }
-  end = PAPI_get_real_cyc() - start;
-  printf("Unroll 8 INTT layers: %lf\n", (double) end/TESTS);
 
 
   // Test NTT
-  start = PAPI_get_real_cyc();
   for (int j = 0; j < TESTS; j++)
   {
+  retval = PAPI_hl_region_begin("c_ntt");
     ntt(r_gold);
+  retval = PAPI_hl_region_end("c_ntt");
   }
-  end = PAPI_get_real_cyc() - start;
-  printf("C 8 NTT layers: %lf\n", (double) end/TESTS);
-
-  start = PAPI_get_real_cyc();
+  
   for (int j = 0; j < TESTS; j++)
   {
+  retval = PAPI_hl_region_begin("merged_neon_ntt");  
     neon_ntt(r1);
+  retval = PAPI_hl_region_end("merged_neon_ntt");
   }
-  end = PAPI_get_real_cyc() - start;
-  printf("Merged 8 NTT layers: %lf\n", (double) end/TESTS);
-
-  start = PAPI_get_real_cyc();
+  
   for (int j = 0; j < TESTS; j++)
   {
+  retval = PAPI_hl_region_begin("unroll_neon_ntt");
     unroll_neon_ntt(r2);
+  retval = PAPI_hl_region_end("unroll_neon_ntt");
   }
-  end = PAPI_get_real_cyc() - start;
-  printf("Unroll 8 NTT layers: %lf\n", (double) end/TESTS);
+  /* Do some computation here */
 
   if (compare(r_gold, r1, 256) && compare(r_gold, r2, 256))
     return 1;

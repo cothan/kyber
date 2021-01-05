@@ -48,61 +48,73 @@ int main()
     printf("NTESTS: %d\n", NTESTS);
     long_long start, end;
 
-    start = cpucycles();
+    //start = cpucycles();
     for (i = 0; i < NTESTS; i++)
     {
         // t[i] = cpucycles();
+        PAPI_hl_region_begin("gen_a");  
         gen_matrix(matrix, seed, 0);
+        PAPI_hl_region_end("gen_a");
     }
-    end = cpucycles() - start;
-    printf("gen_a: %lf\n", (double) end/NTESTS);
+    //end = cpucycles() - start;
+    //printf("gen_a: %lf\n", (double) end/NTESTS);
 
-    start = cpucycles();
+    //start = cpucycles();
     for (i = 0; i < NTESTS; i++)
     {
         // t[i] = cpucycles();
+        PAPI_hl_region_begin("noise1_2x");  
         neon_poly_getnoise_eta1_2x(&ap, &bp, seed, 0, 1);
+        PAPI_hl_region_end("noise1_2x");
     }
-    end = cpucycles() - start;
-    printf("poly_getnoise_eta1: %lf\n", (double) end/NTESTS);
+    //end = cpucycles() - start;
+    //printf("poly_getnoise_eta1: %lf\n", (double) end/NTESTS);
 
-    start = cpucycles();
+    //start = cpucycles();
     for (i = 0; i < NTESTS; i++)
     {
         // t[i] = cpucycles();
+        PAPI_hl_region_begin("noise2_2x");  
         neon_poly_getnoise_eta2_2x(&ap, &bp, seed, 0, 1);
+        PAPI_hl_region_end("noise2_2x");
     }
-    end = cpucycles() - start;
-    printf("poly_getnoise_eta2: %lf\n", (double) end/NTESTS);
+    //end = cpucycles() - start;
+    //printf("poly_getnoise_eta2: %lf\n", (double) end/NTESTS);
 
-    start = cpucycles();
+    //start = cpucycles();
     for (i = 0; i < NTESTS; i++)
     {
         // t[i] = cpucycles();
+        PAPI_hl_region_begin("prf");  
         neon_prf(buf1eta1, buf2eta1, sizeof(buf2eta1), seed, 0, 1);
+        PAPI_hl_region_end("prf");
     }
-    end = cpucycles() - start;
-    printf("prf: %d->%d: %lf\n", 32, sizeof(buf1eta1), (double) end/NTESTS);
+    //end = cpucycles() - start;
+    printf("prf: %d->%d \n", 32, sizeof(buf1eta1) );
 
-    start = cpucycles();
+    //art = cpucycles();
     for (i = 0; i < NTESTS; i++)
     {
         // t[i] = cpucycles();
+        PAPI_hl_region_begin("prf2");
         neon_prf(buf1eta2, buf2eta2, sizeof(buf2eta2), seed, 0, 1);
+        PAPI_hl_region_end("prf2");
     }
-    end = cpucycles() - start;
-    printf("prf: %d->%d: %lf\n", 32, sizeof(buf1eta2), (double) end/NTESTS);
+    //end = cpucycles() - start;
+    printf("prf: %d->%d\n", 32, sizeof(buf1eta2) );
 
 
-    start = cpucycles();
+    //start = cpucycles();
     for (i = 0; i < NTESTS; i++)
     {
         // t[i] = cpucycles();
+        PAPI_hl_region_begin("abs");  
         neon_kyber_shake128_absorb(&state, seed, 0, 1, 1, 0);
         neon_xof_squeezeblocks(buf0, buf1, GEN_MATRIX_NBLOCKS, &state);
+        PAPI_hl_region_end("abs");
     }
-    end = cpucycles() - start;
-    printf("SHAKE128 ABS SQZ: %d->%d: %lf\n", 32, sizeof(buf1), (double) end/NTESTS);
+    //end = cpucycles() - start;
+    printf("SHAKE128 ABS SQZ: %d->%d \n", 32, sizeof(buf1) );
 
 
     return 0;
