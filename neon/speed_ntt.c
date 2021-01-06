@@ -746,49 +746,49 @@ int main(void)
   memcpy(r2, r_gold, sizeof(r_gold));
 
   // Test INTT
-  for (int j = 0; j < TESTS; j++)
-  {
   retval = PAPI_hl_region_begin("c_invntt");
+  for (int j = 0; j < TESTS; j++)
+  {
     invntt(r_gold);
+  }
   retval = PAPI_hl_region_end("c_invntt");
-  }
 
-  for (int j = 0; j < TESTS; j++)
-  {
   retval = PAPI_hl_region_begin("merged_neon_invntt");
-    neon_invntt(r1);
-  retval = PAPI_hl_region_end("merged_neon_invntt");
-  }
-  
   for (int j = 0; j < TESTS; j++)
   {
-  retval = PAPI_hl_region_begin("unroll_neon_invntt");
-    unroll_neon_invntt(r2);
-  retval = PAPI_hl_region_end("unroll_neon_invntt");
+    neon_invntt(r1);
   }
+  retval = PAPI_hl_region_end("merged_neon_invntt");
+  
+  retval = PAPI_hl_region_begin("unroll_neon_invntt");
+  for (int j = 0; j < TESTS; j++)
+  {
+    unroll_neon_invntt(r2);
+  }
+  retval = PAPI_hl_region_end("unroll_neon_invntt");
 
 
   // Test NTT
-  for (int j = 0; j < TESTS; j++)
-  {
   retval = PAPI_hl_region_begin("c_ntt");
+  for (int j = 0; j < TESTS; j++)
+  {
     ntt(r_gold);
+  }
   retval = PAPI_hl_region_end("c_ntt");
-  }
   
-  for (int j = 0; j < TESTS; j++)
-  {
   retval = PAPI_hl_region_begin("merged_neon_ntt");  
-    neon_ntt(r1);
-  retval = PAPI_hl_region_end("merged_neon_ntt");
-  }
-  
   for (int j = 0; j < TESTS; j++)
   {
-  retval = PAPI_hl_region_begin("unroll_neon_ntt");
-    unroll_neon_ntt(r2);
-  retval = PAPI_hl_region_end("unroll_neon_ntt");
+    neon_ntt(r1);
   }
+  retval = PAPI_hl_region_end("merged_neon_ntt");
+  
+  retval = PAPI_hl_region_begin("unroll_neon_ntt");
+  for (int j = 0; j < TESTS; j++)
+  {
+    unroll_neon_ntt(r2);
+  }
+  retval = PAPI_hl_region_end("unroll_neon_ntt");
   /* Do some computation here */
 
   if (compare(r_gold, r1, 256) && compare(r_gold, r2, 256))
