@@ -227,6 +227,7 @@ clean:
 	-$(RM) -rf test_speed512keccak
 	-$(RM) -rf test_speed768keccak
 	-$(RM) -rf test_speed1024keccak
+	-$(RM) -rf test_speed_ntt
 
 bench:
 	./test_speedusec512
