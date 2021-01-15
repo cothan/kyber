@@ -98,47 +98,35 @@ int16_t fqmul(int16_t b, int16_t c) {
   inout = vmovn_s32(t);
 
 /*
-v: int16x8_t
-t : int16x8_t
-t_lo: int16x4_t
-t_hi: int16x4_t
-t1: int32x4_t
-t2: int32x4_t
-temp: int16x8_t
-a: inout int16x8_t
+inout: int16x4_t
+t32 : int32x4_t
+t16: int16x4_t
+neon_v: int16x4_t
+neon_kyberq16: inout int16x4_t
 
-rewrite pseudo code:
 int16_t barrett_reduce(int16_t a) {
   int16_t t;
   const int16_t v = ((1U << 26) + KYBER_Q / 2) / KYBER_Q;
 
-  t = (int32_t)v * a >> 26;
-  t = a + t * (-KYBER_Q);
+  t32 = (int32_t)v * a;
+  t16 = t32 >> 26;
+  t = a + t16 * (-KYBER_Q);
   return t;
 }
 */
-#define barrett(inout, t, t_lo, t_hi, t1, t2, neon_v, neon_kyberq16) \
-  vlo(t_lo, inout);                                                  \
-  vhi(t_hi, inout);                                                  \
-  t1 = vmull_s16(t_lo, neon_v);                                      \
-  t2 = vmull_s16(t_hi, neon_v);                                      \
-  t1 = vshrq_n_s32(t1, 26);                                          \
-  t2 = vshrq_n_s32(t2, 26);                                          \
-  t_lo = vmovn_s32(t1);                                              \
-  t_hi = vmovn_s32(t2);                                              \
-  vcombine(t, t_lo, t_hi);                                           \
-  inout = vmlaq_s16(inout, t, neon_kyberq16);
+#define barrett(inout, t32, t16, neon_v, neon_kyberq16) \
+  t32 = vmull_s16(inout, neon_v);                       \
+  t32 = vshrq_n_s32(t32, 26);                           \
+  t16 = vmovn_s32(t32);                                 \
+  inout = vmla_s16(inout, t16, neon_kyberq16);
 
-// clang ntt.c reduce.c neon_ntt.c -o neon_ntt -O3 -g3 -Wall -Werror -Wextra -Wpedantic -lpapi
-
-#define TESTS 1000000
-
+static 
 void unroll_neon_invntt(int16_t r[256])
 {
   // NEON Registers
-  int16x8_t a, b, c, d, at, bt, ct, dt, neon_zetas, neon_kyberq16;  // 9
-  int16x4_t a_lo, a_hi, b_lo, b_hi, c_lo, c_hi, d_lo, d_hi;         // 8
-  int16x4_t neon_zeta1, neon_zeta2, neon_zeta3, neon_zeta4, neon_v; // 4
+  int16x8_t a, b, c, d, at, bt, ct, neon_zetas;  // 9
+  int16x4_t a_lo, a_hi, b_lo, b_hi, c_lo, c_hi, d_lo, d_hi, zlo, zhi;// 8
+  int16x4_t neon_zeta1, neon_zeta2, neon_zeta3, neon_zeta4, neon_v, neon_kyberq16; // 4
   int32x4_t t1, t2, t3, t4, t5, t6, t7, t8, t9, ta, tb, tc;         // 12
   int32x4_t neon_qinv, neon_kyberq;                                 // 2
   int16x8x4_t ab;                                                   // 4
@@ -146,13 +134,17 @@ void unroll_neon_invntt(int16_t r[256])
   // End
   neon_qinv = vdupq_n_s32(QINV << 16);
   neon_kyberq = vdupq_n_s32(-KYBER_Q);
-  neon_kyberq16 = vdupq_n_s16(-KYBER_Q);
+  neon_kyberq16 = vdup_n_s16(-KYBER_Q);
   neon_v = vdup_n_s16(((1U << 26) + KYBER_Q / 2) / KYBER_Q);
   // Scalar variable
   uint16_t start, len, j, k;
   // End
 
   k = 0;
+
+  // *Vectorize* barret_reduction over 96 points rather than 896 points
+  // Optimimal Barret reduction for Kyber N=256, B=9 is 78 points, see here: 
+  // https://eprint.iacr.org/2020/1377.pdf
 
   //   Layer 1
   for (j = 0; j < 256; j += 32)
@@ -181,8 +173,6 @@ void unroll_neon_invntt(int16_t r[256])
     fqmul(a_lo, neon_zeta1, t1, t2, t3, neon_qinv, neon_kyberq);
     fqmul(a_hi, neon_zeta2, t6, t7, t8, neon_qinv, neon_kyberq);
 
-    barrett(ab.val[0], ct, c_lo, c_hi, t1, t2, neon_v, neon_kyberq16);
-
     vcombine(ab.val[2], a_lo, a_hi);
 
     bt = ab.val[1];
@@ -196,8 +186,6 @@ void unroll_neon_invntt(int16_t r[256])
 
     fqmul(b_lo, neon_zeta1, t4, t5, t6, neon_qinv, neon_kyberq);
     fqmul(b_hi, neon_zeta2, t9, ta, tb, neon_qinv, neon_kyberq);
-
-    barrett(ab.val[1], dt, d_lo, d_hi, t1, t2, neon_v, neon_kyberq16);
 
     vcombine(ab.val[3], b_lo, b_hi);
 
@@ -246,7 +234,6 @@ void unroll_neon_invntt(int16_t r[256])
     fqmul(b_hi, neon_zeta2, t4, t5, t6, neon_qinv, neon_kyberq);
 
     vcombine(at, a_lo, b_lo);
-    barrett(at, bt, c_hi, d_hi, ta, tb, neon_v, neon_kyberq16);
     vlo(a_lo, at);
     vhi(b_lo, at);
 
@@ -285,7 +272,6 @@ void unroll_neon_invntt(int16_t r[256])
     fqmul(d_hi, neon_zeta4, t9, ta, tb, neon_qinv, neon_kyberq);
 
     vcombine(ct, c_lo, d_lo);
-    barrett(ct, dt, a_hi, b_hi, t1, t2, neon_v, neon_kyberq16);
     vlo(c_lo, ct);
     vhi(d_lo, ct);
 
@@ -319,10 +305,7 @@ void unroll_neon_invntt(int16_t r[256])
     //
     fqmul(b_lo, neon_zeta1, t1, t2, t3, neon_qinv, neon_kyberq);
     fqmul(b_hi, neon_zeta1, t4, t5, t6, neon_qinv, neon_kyberq);
-
-    barrett(a, ct, c_lo, c_hi, t1, t2, neon_v, neon_kyberq16);
-
-    vcombine(b, b_lo, b_hi);
+    vcombine(b, b_lo, b_hi);  
 
     aa.val[0] = a;
     aa.val[1] = b;
@@ -345,10 +328,12 @@ void unroll_neon_invntt(int16_t r[256])
 
     fqmul(d_lo, neon_zeta2, t7, t8, t9, neon_qinv, neon_kyberq);
     fqmul(d_hi, neon_zeta2, ta, tb, tc, neon_qinv, neon_kyberq);
-
-    barrett(c, at, a_lo, a_hi, ta, tb, neon_v, neon_kyberq16);
-
     vcombine(d, d_lo, d_hi);
+
+    vlo(c_lo, c);
+    vhi(c_hi, c);
+    barrett(c_lo, t1, zlo, neon_v, neon_kyberq16);
+    vcombine(c, c_lo, c_hi);
 
     bb.val[0] = c;
     bb.val[1] = d;
@@ -383,9 +368,14 @@ void unroll_neon_invntt(int16_t r[256])
         fqmul(c_lo, neon_zeta1, t1, t2, t3, neon_qinv, neon_kyberq);
         fqmul(c_hi, neon_zeta1, t4, t5, t6, neon_qinv, neon_kyberq);
 
-        barrett(a, bt, b_lo, b_hi, t1, t2, neon_v, neon_kyberq16);
-
         vcombine(c, c_lo, c_hi);
+        // barrett(a, bt, b_lo, b_hi, t1, t2, neon_v, neon_kyberq16);
+        vlo(a_lo, a);
+        vhi(a_hi, a);
+        barrett(a_lo, t1, zlo, neon_v, neon_kyberq16);
+        barrett(a_hi, t2, zlo, neon_v, neon_kyberq16);
+        vcombine(a, a_lo, a_hi);
+
 
         bt = b;
         // b = bt(b) + d
@@ -401,7 +391,13 @@ void unroll_neon_invntt(int16_t r[256])
         fqmul(d_lo, neon_zeta1, t7, t8, t9, neon_qinv, neon_kyberq);
         fqmul(d_hi, neon_zeta1, ta, tb, tc, neon_qinv, neon_kyberq);
 
-        barrett(b, at, a_lo, a_hi, ta, tb, neon_v, neon_kyberq16);
+        // barrett(b, at, a_lo, a_hi, ta, tb, neon_v, neon_kyberq16);
+        vlo(b_lo, b);
+        vhi(b_hi, b);
+        barrett(b_lo, t3, zhi, neon_v, neon_kyberq16);
+        barrett(b_hi, t4, zhi, neon_v, neon_kyberq16);
+        vcombine(b, b_lo, b_hi);
+        
 
         vcombine(d, d_lo, d_hi);
 
@@ -447,6 +443,7 @@ void unroll_neon_invntt(int16_t r[256])
   }
 }
 
+static
 void unroll_neon_ntt(int16_t r[256])
 {
   // NEON Registers
@@ -668,24 +665,40 @@ void unroll_neon_ntt(int16_t r[256])
 }
 
 
-
-int compare(int16_t *a, int16_t *b, int length)
+static 
+int compare(int16_t *a, int16_t *b, int length, const char *string)
 {
   int i, j, count = 0;
+  int16_t aa, bb;
   for (i = 0; i < length; i += 8)
   {
     for (j = i; j < i + 8; j++)
     {
-      if (a[j] != b[j])
+      aa = a[j]; // % KYBER_Q;
+      bb = b[j]; // % KYBER_Q;
+      if (aa != bb)
       {
-        printf("%d: %d != %d\n", j, a[j], b[j]);
-        count++;
+        printf("%d: %d != %d: %d != %d ", j, a[j], b[j], aa, bb);
+        if ( (aa + KYBER_Q == bb) || (aa - KYBER_Q == bb) )
+        {
+          printf(": OK\n");
+        }
+        else{
+          count++;
+        }
       }
       if (count > 8)
+      {
+        printf("Incorrect!!\n");
         return 1;
+      }
     }
   }
-  printf("Correct!!\n");
+  if (count) {
+    printf("%s Incorrect!!\n", string);
+    return 1;
+  }
+  
   return 0;
 }
 
@@ -694,6 +707,7 @@ static int16_t fqmul1(int16_t a, int16_t b) {
   return montgomery_reduce((int32_t)a*b);
 }
 
+static
 void ntt(int16_t r[256]) {
   unsigned int len, start, j, k;
   int16_t t, zeta;
@@ -711,6 +725,7 @@ void ntt(int16_t r[256]) {
   }
 }
 
+static
 void invntt(int16_t r[256]) {
   unsigned int start, len, j, k;
   int16_t t, zeta;
@@ -735,13 +750,17 @@ void invntt(int16_t r[256]) {
 #include <sys/random.h>
 #include <string.h>
 
+#define TESTS 1
+
 int main(void)
 {
   int16_t r_gold[256], r1[256], r2[256];
-  long_long start, end;
   int retval;
 
   getrandom(r_gold, sizeof(r_gold), 0);
+  for (int i = 0; i < 256; i++){
+    r_gold[i] %= KYBER_Q;
+  }
   memcpy(r1, r_gold, sizeof(r_gold));
   memcpy(r2, r_gold, sizeof(r_gold));
 
@@ -790,8 +809,10 @@ int main(void)
   }
   retval = PAPI_hl_region_end("unroll_neon_ntt");
   /* Do some computation here */
-
-  if (compare(r_gold, r1, 256) && compare(r_gold, r2, 256))
+  int comp = 0;
+  comp = compare(r_gold, r1, 256, "r_gold vs neon_invntt");
+  comp = comp && compare(r_gold, r2, 256,  "r_gold vs unroll_neon_invntt");
+  if (comp)
     return 1;
 
   return 0;
