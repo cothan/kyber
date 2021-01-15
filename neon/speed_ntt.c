@@ -750,7 +750,7 @@ void invntt(int16_t r[256]) {
 #include <sys/random.h>
 #include <string.h>
 
-#define TESTS 1
+#define TESTS 1000000
 
 int main(void)
 {
@@ -787,7 +787,7 @@ int main(void)
   retval = PAPI_hl_region_end("unroll_neon_invntt");
 
 
-  // // Test NTT
+  // Test NTT
   retval = PAPI_hl_region_begin("c_ntt");
   for (int j = 0; j < TESTS; j++)
   {
