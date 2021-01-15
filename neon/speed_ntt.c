@@ -120,6 +120,7 @@ int16_t barrett_reduce(int16_t a) {
   t16 = vmovn_s32(t32);                                 \
   inout = vmla_s16(inout, t16, neon_kyberq16);
 
+static 
 void unroll_neon_invntt(int16_t r[256])
 {
   // NEON Registers
@@ -442,6 +443,7 @@ void unroll_neon_invntt(int16_t r[256])
   }
 }
 
+static
 void unroll_neon_ntt(int16_t r[256])
 {
   // NEON Registers
@@ -663,7 +665,7 @@ void unroll_neon_ntt(int16_t r[256])
 }
 
 
-
+static 
 int compare(int16_t *a, int16_t *b, int length, const char *string)
 {
   int i, j, count = 0;
@@ -676,9 +678,12 @@ int compare(int16_t *a, int16_t *b, int length, const char *string)
       bb = b[j]; // % KYBER_Q;
       if (aa != bb)
       {
-        if ( (aa + KYBER_Q != bb) && (aa - KYBER_Q != bb) )
+        printf("%d: %d != %d: %d != %d ", j, a[j], b[j], aa, bb);
+        if ( (aa + KYBER_Q == bb) || (aa - KYBER_Q == bb) )
         {
-          printf("%d: %d != %d: %d != %d\n", j, a[j], b[j], aa, bb);
+          printf(": OK\n");
+        }
+        else{
           count++;
         }
       }
@@ -702,6 +707,7 @@ static int16_t fqmul1(int16_t a, int16_t b) {
   return montgomery_reduce((int32_t)a*b);
 }
 
+static
 void ntt(int16_t r[256]) {
   unsigned int len, start, j, k;
   int16_t t, zeta;
@@ -719,6 +725,7 @@ void ntt(int16_t r[256]) {
   }
 }
 
+static
 void invntt(int16_t r[256]) {
   unsigned int start, len, j, k;
   int16_t t, zeta;
@@ -781,26 +788,26 @@ int main(void)
 
 
   // // Test NTT
-  // retval = PAPI_hl_region_begin("c_ntt");
-  // for (int j = 0; j < TESTS; j++)
-  // {
-  //   ntt(r_gold);
-  // }
-  // retval = PAPI_hl_region_end("c_ntt");
+  retval = PAPI_hl_region_begin("c_ntt");
+  for (int j = 0; j < TESTS; j++)
+  {
+    ntt(r_gold);
+  }
+  retval = PAPI_hl_region_end("c_ntt");
   
-  // retval = PAPI_hl_region_begin("merged_neon_ntt");  
-  // for (int j = 0; j < TESTS; j++)
-  // {
-  //   neon_ntt(r1);
-  // }
-  // retval = PAPI_hl_region_end("merged_neon_ntt");
+  retval = PAPI_hl_region_begin("merged_neon_ntt");  
+  for (int j = 0; j < TESTS; j++)
+  {
+    neon_ntt(r1);
+  }
+  retval = PAPI_hl_region_end("merged_neon_ntt");
   
-  // retval = PAPI_hl_region_begin("unroll_neon_ntt");
-  // for (int j = 0; j < TESTS; j++)
-  // {
-  //   unroll_neon_ntt(r2);
-  // }
-  // retval = PAPI_hl_region_end("unroll_neon_ntt");
+  retval = PAPI_hl_region_begin("unroll_neon_ntt");
+  for (int j = 0; j < TESTS; j++)
+  {
+    unroll_neon_ntt(r2);
+  }
+  retval = PAPI_hl_region_end("unroll_neon_ntt");
   /* Do some computation here */
   int comp = 0;
   comp = compare(r_gold, r1, 256, "r_gold vs neon_invntt");
