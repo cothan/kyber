@@ -1,7 +1,7 @@
 # CC ?= /usr/bin/cc
 CC = clang
 CFLAGS += -Wall -Wextra -Wpedantic -Wmissing-prototypes -Wredundant-decls \
-  -Wshadow -Wpointer-arith -O3 -march=native -fomit-frame-pointer
+  -Wshadow -Wpointer-arith -O3 -mtune=native -fomit-frame-pointer -g3
 NISTFLAGS += -Wno-unused-result -O3
 RM = /bin/rm
 LIBPAPI = lib/libpapi.a
