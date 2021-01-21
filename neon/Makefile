@@ -5,7 +5,7 @@ CFLAGS += -Wall -Wextra -Wpedantic -Wmissing-prototypes -Wredundant-decls \
 NISTFLAGS +=   -Wall -Wextra -Wpedantic -Wmissing-prototypes -Wredundant-decls \
   -Wshadow -Wpointer-arith -Wno-unused-result -O3 -mtune=native -fomit-frame-pointer
 RM = /bin/rm
-LIBPAPI = lib/libpapi.a
+LIBPAPI = -lpapi
 
 SOURCES = kem.c indcpa.c cbd.c neon_symmetric-shake.c neon_polyvec.c neon_poly.c polyvec.c poly.c reduce.c neon_ntt.c ntt.c verify.c
 SOURCESKECCAK = $(SOURCES) fips202x2.c fips202.c symmetric-shake.c rejsample.c
