@@ -202,7 +202,7 @@ void neon_invntt(int16_t r[256])
 
   // Layer 1, 2, 3, 4, 5
   // Total register: 26
-  for (j = 0; j < 256; j += 64)
+  for (j = 0; j < 256; j += 128)
   {
     // 1st layer : v0.val[0] x v0.val[2] | v0.val[1] x v0.val[3]
     // v0.val[0]: 0, 4, 8,  12 | 16, 20, 24, 28
@@ -211,12 +211,20 @@ void neon_invntt(int16_t r[256])
     // v0.val[3]: 3, 7, 11, 15 | 19, 23, 27, 31
     vload4(v0, &r[j]);
     vload4(v1, &r[j+32]);
+    vload4(v2, &r[j+64]);
+    vload4(v3, &r[j+96]);
 
     addsub(v0, v0, 0, 2, e_tmp);
     addsub(v0, v0, 1, 3, o_tmp);
 
     addsub(v1, v1, 0, 2, e_tmp);
     addsub(v1, v1, 1, 3, o_tmp);
+
+    addsub(v2, v2, 0, 2, e_tmp);
+    addsub(v2, v2, 1, 3, o_tmp);
+
+    addsub(v3, v3, 0, 2, e_tmp);
+    addsub(v3, v3, 1, 3, o_tmp);
 
     vload(z0, &zetas_inv[k1]);
     vload(z1, &zetas_inv[k1+8]);
@@ -227,10 +235,21 @@ void neon_invntt(int16_t r[256])
     fqmul(v1.val[2], v1.val[2], z1, t1, t2, t3, t4, neon_qinv, neon_kyberq);
     fqmul(v1.val[3], v1.val[3], z1, t1, t2, t3, t4, neon_qinv, neon_kyberq);
 
+    vload(z0, &zetas_inv[k1]);
+    vload(z1, &zetas_inv[k1+8]);
+    k1 += 16;
+    fqmul(v2.val[2], v2.val[2], z0, t1, t2, t3, t4, neon_qinv, neon_kyberq);
+    fqmul(v2.val[3], v2.val[3], z0, t1, t2, t3, t4, neon_qinv, neon_kyberq);
+
+    fqmul(v3.val[2], v3.val[2], z1, t1, t2, t3, t4, neon_qinv, neon_kyberq);
+    fqmul(v3.val[3], v3.val[3], z1, t1, t2, t3, t4, neon_qinv, neon_kyberq);
+
     // Layer 2: v0.val[0] x v0.val[1] | v0.val[2] x v0.val[3]
     // Tranpose 4x4
-    tranpose(v0, v2);
-    tranpose(v1, v3);
+    tranpose(v0, va);
+    tranpose(v1, vb);
+    tranpose(v2, va);
+    tranpose(v3, vb);
 
     // v0.val[0]: 0,  1,  2,  3  | 16,  17,  18,  19
     // v0.val[1]: 4,  5,  6,  7  | 20,  21,  22,  23
@@ -242,6 +261,12 @@ void neon_invntt(int16_t r[256])
 
     addsub(v1, v1, 0, 1, e_tmp);
     addsub(v1, v1, 2, 3, o_tmp);
+
+    addsub(v2, v2, 0, 1, e_tmp);
+    addsub(v2, v2, 2, 3, o_tmp);
+
+    addsub(v3, v3, 0, 1, e_tmp);
+    addsub(v3, v3, 2, 3, o_tmp);
 
     vdup(a_lo, zetas_inv[k2]);
     vdup(b_lo, zetas_inv[k2 + 1]);
@@ -266,6 +291,29 @@ void neon_invntt(int16_t r[256])
     fqmul(v1.val[1], v1.val[1], z2, t1, t2, t3, t4, neon_qinv, neon_kyberq);
     fqmul(v1.val[3], v1.val[3], z3, t1, t2, t3, t4, neon_qinv, neon_kyberq);
 
+    vdup(a_lo, zetas_inv[k2]);
+    vdup(b_lo, zetas_inv[k2 + 1]);
+    vdup(a_hi, zetas_inv[k2 + 2]);
+    vdup(b_hi, zetas_inv[k2 + 3]);
+
+    vcombine(z0, a_lo, a_hi);
+    vcombine(z1, b_lo, b_hi);
+    
+    vdup(a_lo, zetas_inv[k2 + 4]);
+    vdup(b_lo, zetas_inv[k2 + 5]);
+    vdup(a_hi, zetas_inv[k2 + 6]);
+    vdup(b_hi, zetas_inv[k2 + 7]);
+
+    vcombine(z2, a_lo, a_hi);
+    vcombine(z3, b_lo, b_hi);
+    k2 += 8;
+
+    fqmul(v2.val[1], v2.val[1], z0, t1, t2, t3, t4, neon_qinv, neon_kyberq);
+    fqmul(v2.val[3], v2.val[3], z1, t1, t2, t3, t4, neon_qinv, neon_kyberq);
+
+    fqmul(v3.val[1], v3.val[1], z2, t1, t2, t3, t4, neon_qinv, neon_kyberq);
+    fqmul(v3.val[3], v3.val[3], z3, t1, t2, t3, t4, neon_qinv, neon_kyberq);
+
 
     // Layer 3 : v0.val[0] x v0.val[2] | v0.val[1] x v0.val[3]
     // v0.val[0]: 0,  1,  2,  3  | 16,  17,  18,  19
@@ -278,6 +326,12 @@ void neon_invntt(int16_t r[256])
 
     addsub(v1, v1, 0, 2, e_tmp);
     addsub(v1, v1, 1, 3, o_tmp);
+
+    addsub(v2, v2, 0, 2, e_tmp);
+    addsub(v2, v2, 1, 3, o_tmp);
+
+    addsub(v3, v3, 0, 2, e_tmp);
+    addsub(v3, v3, 1, 3, o_tmp);
 
     vdup(a_lo, zetas_inv[k3]);
     vdup(a_hi, zetas_inv[k3 + 1]);
@@ -292,6 +346,20 @@ void neon_invntt(int16_t r[256])
 
     fqmul(v1.val[2], v1.val[2], z1, t1, t2, t3, t4, neon_qinv, neon_kyberq);
     fqmul(v1.val[3], v1.val[3], z1, t1, t2, t3, t4, neon_qinv, neon_kyberq);
+
+    vdup(a_lo, zetas_inv[k3]);
+    vdup(a_hi, zetas_inv[k3 + 1]);
+    vdup(b_lo, zetas_inv[k3 + 2]);
+    vdup(b_hi, zetas_inv[k3 + 3]);
+    k3 += 4;
+    vcombine(z0, a_lo, a_hi);
+    vcombine(z1, b_lo, b_hi);
+
+    fqmul(v2.val[2], v2.val[2], z0, t1, t2, t3, t4, neon_qinv, neon_kyberq);
+    fqmul(v2.val[3], v2.val[3], z0, t1, t2, t3, t4, neon_qinv, neon_kyberq);
+
+    fqmul(v3.val[2], v3.val[2], z1, t1, t2, t3, t4, neon_qinv, neon_kyberq);
+    fqmul(v3.val[3], v3.val[3], z1, t1, t2, t3, t4, neon_qinv, neon_kyberq);
     
     // 16, 17, 18, 19
     vlo(a_lo, v0.val[0]);
@@ -305,19 +373,30 @@ void neon_invntt(int16_t r[256])
     vcombine(v0.val[0], a_lo, a_hi);
     vcombine(v1.val[0], b_lo, b_hi);
 
+    vlo(a_lo, v2.val[0]);
+    vhi(a_hi, v2.val[0]);
+    vlo(b_lo, v3.val[0]);
+    vhi(b_hi, v3.val[0]);
+
+    barrett(a_hi, t1, zhi, neon_v, neon_kyberq16);
+    barrett(b_hi, t2, zhi, neon_v, neon_kyberq16);
+
+    vcombine(v2.val[0], a_lo, a_hi);
+    vcombine(v3.val[0], b_lo, b_hi);
+
 
     // Layer 4: v0.val[0] x v0.val[1] | v0.val[2] x v0.val[3]
     // Re-arrange vector
-    arrange(v2, v0);
-    arrange(v3, v1);
+    arrange(va, v0);
+    arrange(vb, v1);
 
     // v2.val[0]: 0,  1,  2,  3  | 4,  5,  6,  7
     // v2.val[1]: 16, 17, 18, 19 | 20, 21, 22, 23
     // v2.val[2]: 8,  9,  10, 11 | 12, 13, 14, 15
     // v2.val[3]: 24, 25, 26, 27 | 28, 29, 30, 31
 
-    addsub_twist(v0, v2, 0, 1, 2, 3, e_tmp, o_tmp);
-    addsub_twist(v1, v3, 0, 1, 2, 3, e_tmp, o_tmp);
+    addsub_twist(v0, va, 0, 1, 2, 3, e_tmp, o_tmp);
+    addsub_twist(v1, vb, 0, 1, 2, 3, e_tmp, o_tmp);
 
     z0 = vdupq_n_s16(zetas_inv[k4]);
     z1 = vdupq_n_s16(zetas_inv[k4+1]);
@@ -340,37 +419,44 @@ void neon_invntt(int16_t r[256])
     vcombine(v0.val[0], a_lo, a_hi);
     vcombine(v1.val[0], b_lo, b_hi);
 
-    // Layer 5: 
-    // v0.val[0] x v1.val[0]
-    // v0.val[1] x v1.val[1]
-    // v0.val[2] x v1.val[2]
-    // v0.val[3] x v1.val[3]
+    arrange(va, v2);
+    arrange(vb, v3);
+
+    // v2.val[0]: 0,  1,  2,  3  | 4,  5,  6,  7
+    // v2.val[1]: 16, 17, 18, 19 | 20, 21, 22, 23
+    // v2.val[2]: 8,  9,  10, 11 | 12, 13, 14, 15
+    // v2.val[3]: 24, 25, 26, 27 | 28, 29, 30, 31
+
+    addsub_twist(v2, va, 0, 1, 2, 3, e_tmp, o_tmp);
+    addsub_twist(v3, vb, 0, 1, 2, 3, e_tmp, o_tmp);
+
+    z0 = vdupq_n_s16(zetas_inv[k4]);
+    z1 = vdupq_n_s16(zetas_inv[k4+1]);
+    k4 += 2;
+    fqmul(v2.val[2], v2.val[2], z0, t1, t2, t3, t4, neon_qinv, neon_kyberq);
+    fqmul(v2.val[3], v2.val[3], z0, t1, t2, t3, t4, neon_qinv, neon_kyberq);
+
+    fqmul(v3.val[2], v3.val[2], z1, t1, t2, t3, t4, neon_qinv, neon_kyberq);
+    fqmul(v3.val[3], v3.val[3], z1, t1, t2, t3, t4, neon_qinv, neon_kyberq);
+
+    // 0, 1, 2, 3
+    vlo(a_lo, v2.val[0]);
+    vhi(a_hi, v2.val[0]);
+    vlo(b_lo, v3.val[0]);
+    vhi(b_hi, v3.val[0]);
+
+    barrett(a_lo, t1, zlo, neon_v, neon_kyberq16);
+    barrett(b_lo, t1, zlo, neon_v, neon_kyberq16);
+
+    vcombine(v2.val[0], a_lo, a_hi);
+    vcombine(v3.val[0], b_lo, b_hi);
+
     
-    // // 0 + 32
-    // vadd8(v0.val[0], va.val[0], v1.val[0]);
-    // vadd8(v0.val[1], va.val[1], v1.val[1]);
-    // vadd8(v0.val[2], va.val[2], v1.val[2]);
-    // vadd8(v0.val[3], va.val[3], v1.val[3]);
-    // // 0 - 32
-    // vsub8(v1.val[0], va.val[0], v1.val[0]);
-    // vsub8(v1.val[1], va.val[1], v1.val[1]);
-    // vsub8(v1.val[2], va.val[2], v1.val[2]);
-    // vsub8(v1.val[3], va.val[3], v1.val[3]);
-
-    // vlo(a_lo, v0.val[0]);
-    // vhi(a_hi, v0.val[0]);
-
-    // barrett(a_hi, t1, zhi, neon_v, neon_kyberq16);
-    // vcombine(v0.val[0], a_lo, a_hi);
-
-    // l0 = vdupq_n_s16(zetas_inv[k5++]);
-    // fqmul(v1.val[0], v1.val[0], l0, t1, t2, t3, t4, neon_qinv, neon_kyberq);
-    // fqmul(v1.val[1], v1.val[1], l0, t1, t2, t3, t4, neon_qinv, neon_kyberq);
-    // fqmul(v1.val[2], v1.val[2], l0, t1, t2, t3, t4, neon_qinv, neon_kyberq);
-    // fqmul(v1.val[3], v1.val[3], l0, t1, t2, t3, t4, neon_qinv, neon_kyberq);
 
     vstorex4(&r[j], v0);
     vstorex4(&r[j+32], v1);
+    vstorex4(&r[j+64], v2);
+    vstorex4(&r[j+96], v3);
   }
 
   // Layer 5, 6
