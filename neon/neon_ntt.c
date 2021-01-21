@@ -451,28 +451,6 @@ void neon_invntt(int16_t r[256])
     vcombine(v2.val[0], a_lo, a_hi);
     vcombine(v3.val[0], b_lo, b_hi);
 
-    
-
-    vstorex4(&r[j], v0);
-    vstorex4(&r[j+32], v1);
-    vstorex4(&r[j+64], v2);
-    vstorex4(&r[j+96], v3);
-  }
-
-  // Layer 5, 6
-  // Total register: 5x4 + 4(const) + 2(zlo, zhi) + 4(ab_hi, lo) + 2(t1-t6) = 32
-  for (j = 0; j < 256; j += 128)
-  {
-    // Layer 5: v0 x v1 | v2 x v3
-    // v0: 0  -> 31
-    // v1: 32 -> 63
-    // v2: 64 -> 95
-    // v3: 96 -> 127
-    vloadx4(v0, &r[j + 0]);
-    vloadx4(v1, &r[j + 32]);
-    vloadx4(v2, &r[j + 64]);
-    vloadx4(v3, &r[j + 96]);
-
     va.val[0] = v0.val[0];
     va.val[1] = v0.val[1];
     va.val[2] = v0.val[2];
@@ -593,11 +571,12 @@ void neon_invntt(int16_t r[256])
     fqmul(v3.val[1], v3.val[1], l0, t1, t2, t3, t4, neon_qinv, neon_kyberq);
     fqmul(v3.val[2], v3.val[2], l0, t1, t2, t3, t4, neon_qinv, neon_kyberq);
     fqmul(v3.val[3], v3.val[3], l0, t1, t2, t3, t4, neon_qinv, neon_kyberq);
+    
 
-    vstorex4(&r[j + 0], v0);
-    vstorex4(&r[j + 32], v1);
-    vstorex4(&r[j + 64], v2);
-    vstorex4(&r[j + 96], v3);
+    vstorex4(&r[j], v0);
+    vstorex4(&r[j+32], v1);
+    vstorex4(&r[j+64], v2);
+    vstorex4(&r[j+96], v3);
   }
 
   // Layer 7, inv_mul
