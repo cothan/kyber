@@ -689,7 +689,7 @@ int compare(int16_t *a, int16_t *b, int length, const char *string)
       }
       if (count > 8)
       {
-        printf("Incorrect!!\n");
+        printf("%s Incorrect!!\n", string);
         return 1;
       }
     }
