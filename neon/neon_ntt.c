@@ -184,21 +184,20 @@ Re-arrange vector
 
 /*
 Butterfly Unit
-Input: v, i, j, tmp
-Output: v
+Input: 
+v: int16x8x4_t
+i, j, m, n: index 
+tmp1, tmp2: int16x8_t
+Output: 
+v: int16x8x4_t
 */
-#define addsub(v, v_in, i, j, tmp)   \
-  tmp = v_in.val[i];                 \
-  vadd8(v.val[i], tmp, v_in.val[j]); \
-  vsub8(v.val[j], tmp, v_in.val[j]);
-
-#define addsub_new(v, i, j, m, n, tmp1, tmp2) \
-  tmp1 = v.val[i];                            \
-  tmp2 = v.val[m];                            \
-  vadd8(v.val[i], tmp1, v.val[j]);            \
-  vsub8(v.val[j], tmp1, v.val[j]);            \
-  vadd8(v.val[m], tmp2, v.val[n]);            \
-  vsub8(v.val[n], tmp2, v.val[n]);
+#define addsub(v, i, j, m, n, t1, t2) \
+  t1 = v.val[i];                        \
+  t2 = v.val[m];                        \
+  vadd8(v.val[i], t1, v.val[j]);        \
+  vsub8(v.val[j], t1, v.val[j]);        \
+  vadd8(v.val[m], t2, v.val[n]);        \
+  vsub8(v.val[n], t2, v.val[n]);
 
 #define addsub_x4(v0, v1, va)             \
   va.val[0] = v0.val[0];                  \
@@ -214,14 +213,13 @@ Output: v
   vsub8(v1.val[2], va.val[2], v1.val[2]); \
   vsub8(v1.val[3], va.val[3], v1.val[3]);
 
-#define addsub_twist(v, v_in, i, j, m, n, tmp1, tmp2)   \
-  tmp1 = v_in.val[i];                 \
-  tmp2 = v_in.val[m];                 \
-  vadd8(v.val[i], tmp1, v_in.val[j]); \
-  vsub8(v.val[m], tmp1, v_in.val[j]); \
-  vadd8(v.val[j], tmp2, v_in.val[n]); \
-  vsub8(v.val[n], tmp2, v_in.val[n]);
-
+#define addsub_twist(v, v_in, i, j, m, n, t1, t2) \
+  t1 = v_in.val[i];                              \
+  t2 = v_in.val[m];                              \
+  vadd8(v.val[i], t1, v_in.val[j]);              \
+  vsub8(v.val[m], t1, v_in.val[j]);              \
+  vadd8(v.val[j], t2, v_in.val[n]);              \
+  vsub8(v.val[n], t2, v_in.val[n]);
 
 /*************************************************
 * Name:        invntt_tomont
@@ -269,10 +267,10 @@ void neon_invntt(int16_t r[256])
     vload4(v2, &r[j+64]);
     vload4(v3, &r[j+96]);
 
-    addsub_new(v0, 0, 2, 1, 3, z0, z1);
-    addsub_new(v1, 0, 2, 1, 3, z0, z1);
-    addsub_new(v2, 0, 2, 1, 3, z0, z1);
-    addsub_new(v3, 0, 2, 1, 3, z0, z1);
+    addsub(v0, 0, 2, 1, 3, z0, z1);
+    addsub(v1, 0, 2, 1, 3, z0, z1);
+    addsub(v2, 0, 2, 1, 3, z0, z1);
+    addsub(v3, 0, 2, 1, 3, z0, z1);
 
     vload(z0, &zetas_inv[k1]);
     vload(z1, &zetas_inv[k1+8]);
@@ -303,10 +301,10 @@ void neon_invntt(int16_t r[256])
     // v0.val[2]: 8,  9,  10, 11 | 24,  25,  26,  27
     // v0.val[3]: 12, 13, 14, 15 | 28,  29,  30,  31
 
-    addsub_new(v0, 0, 1, 2, 3, z0, z1);
-    addsub_new(v1, 0, 1, 2, 3, z0, z1);
-    addsub_new(v2, 0, 1, 2, 3, z0, z1);
-    addsub_new(v3, 0, 1, 2, 3, z0, z1);
+    addsub(v0, 0, 1, 2, 3, z0, z1);
+    addsub(v1, 0, 1, 2, 3, z0, z1);
+    addsub(v2, 0, 1, 2, 3, z0, z1);
+    addsub(v3, 0, 1, 2, 3, z0, z1);
 
     vdup(a_lo, zetas_inv[k2]);
     vdup(b_lo, zetas_inv[k2 + 1]);
@@ -357,10 +355,10 @@ void neon_invntt(int16_t r[256])
     // v0.val[2]: 8,  9,  10, 11 | 24,  25,  26,  27
     // v0.val[3]: 12, 13, 14, 15 | 28,  29,  30,  31
 
-    addsub_new(v0, 0, 2, 1, 3, z0, z1);
-    addsub_new(v1, 0, 2, 1, 3, z0, z1);
-    addsub_new(v2, 0, 2, 1, 3, z0, z1);
-    addsub_new(v3, 0, 2, 1, 3, z0, z1);
+    addsub(v0, 0, 2, 1, 3, z0, z1);
+    addsub(v1, 0, 2, 1, 3, z0, z1);
+    addsub(v2, 0, 2, 1, 3, z0, z1);
+    addsub(v3, 0, 2, 1, 3, z0, z1);
 
     vdup(a_lo, zetas_inv[k3]);
     vdup(a_hi, zetas_inv[k3 + 1]);
@@ -390,27 +388,7 @@ void neon_invntt(int16_t r[256])
     fqmul(v3.val[2], v3.val[2], z3, t1, t2, t3, t4);
     fqmul(v3.val[3], v3.val[3], z3, t1, t2, t3, t4);
     
-    // // 16, 17, 18, 19
-    // vlo(a_lo, v0.val[0]);
-    // vhi(a_hi, v0.val[0]);
-    // vlo(b_lo, v1.val[0]);
-    // vhi(b_hi, v1.val[0]);
-
-    // vlo(c_lo, v2.val[0]);
-    // vhi(c_hi, v2.val[0]);
-    // vlo(d_lo, v3.val[0]);
-    // vhi(d_hi, v3.val[0]);
-
-    // barrett(a_hi, t1, t0, neon_v, neon_kyberq16);
-    // barrett(b_hi, t2, t0, neon_v, neon_kyberq16);
-    // barrett(c_hi, t3, t0, neon_v, neon_kyberq16);
-    // barrett(d_hi, t4, t0, neon_v, neon_kyberq16);
-
-    // vcombine(v0.val[0], a_lo, a_hi);
-    // vcombine(v1.val[0], b_lo, b_hi);
-    // vcombine(v2.val[0], c_lo, c_hi);
-    // vcombine(v3.val[0], d_lo, d_hi);
-
+    // 16, 17, 18, 19
     barret_hi(v0.val[0], v1.val[0], t1, t2, z0, z1);
     barret_hi(v2.val[0], v3.val[0], t3, t4, z2, z3);
 
@@ -453,26 +431,7 @@ void neon_invntt(int16_t r[256])
     fqmul(v3.val[3], v3.val[3], z3, t1, t2, t3, t4);
 
 
-    // // 0, 1, 2, 3
-    // vlo(a_lo, v0.val[0]);
-    // vhi(a_hi, v0.val[0]);
-    // vlo(b_lo, v1.val[0]);
-    // vhi(b_hi, v1.val[0]);
-
-    // vlo(c_lo, v2.val[0]);
-    // vhi(c_hi, v2.val[0]);
-    // vlo(d_lo, v3.val[0]);
-    // vhi(d_hi, v3.val[0]);
-
-    // barrett(a_lo, t1, t0, neon_v, neon_kyberq16);
-    // barrett(b_lo, t2, t0, neon_v, neon_kyberq16);
-    // barrett(c_lo, t3, t0, neon_v, neon_kyberq16);
-    // barrett(d_lo, t4, t0, neon_v, neon_kyberq16);
-
-    // vcombine(v0.val[0], a_lo, a_hi);
-    // vcombine(v1.val[0], b_lo, b_hi);
-    // vcombine(v2.val[0], c_lo, c_hi);
-    // vcombine(v3.val[0], d_lo, d_hi);
+    // 0, 1, 2, 3
     barret_lo(v0.val[0], v1.val[0], t1, t2, z0, z1);
     barret_lo(v2.val[0], v3.val[0], t3, t4, z2, z3);
 
@@ -485,16 +444,6 @@ void neon_invntt(int16_t r[256])
     addsub_x4(v0, v1, va);
     addsub_x4(v2, v3, vb);
 
-    // vlo(a_lo, v0.val[0]);
-    // vhi(a_hi, v0.val[0]);
-    // vlo(b_lo, v2.val[0]);
-    // vhi(b_hi, v2.val[0]);
-    
-    // barrett(a_hi, t1, t0, neon_v, neon_kyberq16);
-    // barrett(b_hi, t2, t0, neon_v, neon_kyberq16);
-    
-    // vcombine(v0.val[0], a_lo, a_hi);
-    // vcombine(v2.val[0], b_lo, b_hi);
     barret_hi(v0.val[0], v2.val[0], t1, t2, z0, z1);
 
     z0 = vdupq_n_s16(zetas_inv[k5]);
@@ -520,21 +469,9 @@ void neon_invntt(int16_t r[256])
     addsub_x4(v0, v2, va);
     addsub_x4(v1, v3, vb);
 
-    // vlo(a_lo, v0.val[1]);
-    // vhi(a_hi, v0.val[1]);
-    // vlo(b_lo, v1.val[1]);
-    // vhi(b_hi, v1.val[1]);
-    
-    // barrett(a_lo, t1, t0, neon_v, neon_kyberq16);
-    // barrett(a_hi, t2, t0, neon_v, neon_kyberq16);
-    // barrett(b_lo, t3, t0, neon_v, neon_kyberq16);
-    // barrett(b_hi, t4, t0, neon_v, neon_kyberq16);
     barret_lh(v0.val[1], t1, t2, z2);
     barret_lh(v1.val[1], t3, t4, z3);
-    
-    // vcombine(v0.val[1], a_lo, a_hi);
-    // vcombine(v1.val[1], b_lo, b_hi);
-    
+        
     z0 = vdupq_n_s16(zetas_inv[k6++]);
 
     fqmul(v2.val[0], v2.val[0], z0, t1, t2, t3, t4);
