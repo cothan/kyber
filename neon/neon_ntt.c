@@ -88,12 +88,12 @@ int16_t fqmul(int16_t b, int16_t c) {
 #define fqmul(out, in, zeta, a1, a2, u1, u2)            \
   a1 = vmull_s16(vget_low_s16(in), vget_low_s16(zeta)); \
   a2 = vmull_high_s16(in, zeta);                        \
-  u1 = vmulq_n_s32(a1, QINV << 16);                     \
-  u2 = vmulq_n_s32(a2, QINV << 16);                     \
+  u1 = vmulq_s32(a1, neon_qinv);                        \
+  u2 = vmulq_s32(a2, neon_qinv);                        \
   u1 = vshrq_n_s32(u1, 16);                             \
   u2 = vshrq_n_s32(u2, 16);                             \
-  u1 = vmulq_n_s32(u1, -KYBER_Q);                       \
-  u2 = vmulq_n_s32(u2, -KYBER_Q);                       \
+  u1 = vmulq_s32(u1, neon_kyberq);                      \
+  u2 = vmulq_s32(u2, neon_kyberq);                      \
   out = vaddhn_high_s32(vaddhn_s32(u1, a1), u2, a2);
 
 /*
@@ -123,12 +123,12 @@ t16: int16x8_t
 neon_v, neon_kyber16
 */
 #define barret_lh(inout, t32_1, t32_2, t16)      \
-  t32_1 = vmull_n_s16(vget_low_s16(inout), _V);  \
-  t32_2 = vmull_high_n_s16(inout, _V);           \
+  t32_1 = vmull_s16(vget_low_s16(inout), vget_low_s16(neon_v) );  \
+  t32_2 = vmull_high_s16(inout, neon_v);           \
   t32_1 = vshrq_n_s32(t32_1, 26);                \
   t32_2 = vshrq_n_s32(t32_2, 26);                \
   t16 = vmovn_high_s32(vmovn_s32(t32_1), t32_2); \
-  inout = vmlaq_n_s16(inout, t16, -KYBER_Q);
+  inout = vmlaq_s16(inout, t16, neon_kyberq16);
 
 /*
 in1, in2: int16x8_t 
@@ -137,24 +137,24 @@ t32_1, t32_2: int32x4_t
 t16: int16x8_t
 */
 #define barret_hi(in1, in2, t32_1, t32_2, t16_1, t16_2)           \
-  t32_1 = vmull_high_n_s16(in1, _V);                              \
-  t32_2 = vmull_high_n_s16(in2, _V);                              \
+  t32_1 = vmull_high_s16(in1, neon_v);                              \
+  t32_2 = vmull_high_s16(in2, neon_v);                              \
   t32_1 = vshrq_n_s32(t32_1, 26);                                 \
   t32_2 = vshrq_n_s32(t32_2, 26);                                 \
   t16_1 = vmovn_high_s32(vmovn_s32(t32_1), t32_2);                \
   t16_2 = (int16x8_t)vzip2q_s64((int64x2_t)in1, (int64x2_t)in2);  \
-  t16_2 = vmlaq_n_s16(t16_2, t16_1, -KYBER_Q);                    \
+  t16_2 = vmlaq_s16(t16_2, t16_1, neon_kyberq16);                    \
   in1 = (int16x8_t)vcopyq_laneq_s64((int64x2_t)in1, 1, (int64x2_t) t16_2, 0); \
   in2 = (int16x8_t)vcopyq_laneq_s64((int64x2_t)in2, 1, (int64x2_t) t16_2, 1);
 
 #define barret_lo(in1, in2, t32_1, t32_2, t16_1, t16_2)           \
-  t32_1 = vmull_n_s16(vget_low_s16(in1), _V);                     \
-  t32_2 = vmull_n_s16(vget_low_s16(in2), _V);                     \
+  t32_1 = vmull_s16(vget_low_s16(in1), vget_low_s16(neon_v));                     \
+  t32_2 = vmull_s16(vget_low_s16(in2), vget_low_s16(neon_v));                     \
   t32_1 = vshrq_n_s32(t32_1, 26);                                 \
   t32_2 = vshrq_n_s32(t32_2, 26);                                 \
   t16_1 = vmovn_high_s32(vmovn_s32(t32_1), t32_2);                \
   t16_2 = (int16x8_t)vzip1q_s64((int64x2_t)in1, (int64x2_t)in2);  \
-  t16_2 = vmlaq_n_s16(t16_2, t16_1, -KYBER_Q);                    \
+  t16_2 = vmlaq_s16(t16_2, t16_1, neon_kyberq16);                    \
   in1 = (int16x8_t)vcopyq_laneq_s64((int64x2_t)in1, 0, (int64x2_t) t16_2, 0); \
   in2 = (int16x8_t)vcopyq_laneq_s64((int64x2_t)in2, 0, (int64x2_t) t16_2, 1);
 
@@ -270,6 +270,12 @@ void neon_invntt(int16_t r[256])
   k5 = 120;
   k6 = 124;
   // End
+  int32x4_t neon_qinv, neon_kyberq;
+  int16x8_t neon_v, neon_kyberq16;
+  neon_qinv = vdupq_n_s32(QINV << 16);
+  neon_kyberq = vdupq_n_s32(-KYBER_Q);
+  neon_v = vdupq_n_s16(_V);
+  neon_kyberq16 = vdupq_n_s16(-KYBER_Q);
 
   // *Vectorize* barret_reduction over 96 points rather than 896 points
   // Optimimal Barret reduction for Kyber N=256, B=9 is 78 points, see here: 
@@ -586,7 +592,7 @@ void neon_ntt(int16_t r[256])
 {
   int j, k1, k2, k3, k4, k5, k6;
   // Register: Total 26
-  int16x8x4_t vt1, vt2, v0, v1, v2, v3, z; // 28
+  int16x8x4_t vt, vt1, vt2, v0, v1, v2, v3, z; // 28
   int16x4_t a_lo, a_hi, b_lo, b_hi; // 4
   int32x4_t t1, t2, t3, t4;         // 4
   // Scalar
@@ -597,6 +603,9 @@ void neon_ntt(int16_t r[256])
   k5 = 4;
   k6 = 2;
   // End
+  int32x4_t neon_qinv, neon_kyberq; 
+  neon_qinv = vdupq_n_s32(QINV << 16);
+  neon_kyberq = vdupq_n_s32(-KYBER_Q);
 
   // Layer 7
   // Total registers: 32
@@ -634,7 +643,7 @@ void neon_ntt(int16_t r[256])
     vstorex4(&r[j + 160], v3);
   }
 
-  // Layer 6, 5
+  // Layer 6, 5, 4, 3, 2, 1
   for (j = 0; j < 256; j += 128)
   {
     // Layer 6: v0 x v2 | v1 x v3
