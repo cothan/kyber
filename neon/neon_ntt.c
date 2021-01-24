@@ -168,18 +168,18 @@ Output:
 v: int16x8x4_t
 */
 #define addsub(v, i, j, m, n, t1, t2) \
-  vcopy(t1, v.val[i]);                      \
-  vcopy(t2, v.val[m]);                      \
+  vcopy(t1, v.val[i]);                \
+  vcopy(t2, v.val[m]);                \
   vadd8(v.val[i], t1, v.val[j]);      \
   vsub8(v.val[j], t1, v.val[j]);      \
   vadd8(v.val[m], t2, v.val[n]);      \
   vsub8(v.val[n], t2, v.val[n]);
 
 #define addsub_x4(v0, v1, va)             \
-  vcopy(va.val[0] , v0.val[0]);                  \
-  vcopy(va.val[1] , v0.val[1]);                  \
-  vcopy(va.val[2] , v0.val[2]);                  \
-  vcopy(va.val[3] , v0.val[3]);                  \
+  vcopy(va.val[0], v0.val[0]);            \
+  vcopy(va.val[1], v0.val[1]);            \
+  vcopy(va.val[2], v0.val[2]);            \
+  vcopy(va.val[3], v0.val[3]);            \
   vadd8(v0.val[0], va.val[0], v1.val[0]); \
   vadd8(v0.val[1], va.val[1], v1.val[1]); \
   vadd8(v0.val[2], va.val[2], v1.val[2]); \
@@ -190,8 +190,8 @@ v: int16x8x4_t
   vsub8(v1.val[3], va.val[3], v1.val[3]);
 
 #define addsub_twist(v, v_in, i, j, m, n, t1, t2) \
-  vcopy(t1 , v_in.val[i]);                               \
-  vcopy(t2 , v_in.val[m]);                               \
+  vcopy(t1, v_in.val[i]);                         \
+  vcopy(t2, v_in.val[m]);                         \
   vadd8(v.val[i], t1, v_in.val[j]);               \
   vsub8(v.val[m], t1, v_in.val[j]);               \
   vadd8(v.val[j], t2, v_in.val[n]);               \
