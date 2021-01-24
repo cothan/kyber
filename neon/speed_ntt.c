@@ -124,7 +124,7 @@ static
 void unroll_neon_invntt(int16_t r[256])
 {
   // NEON Registers
-  int16x8_t a, b, c, d, at, bt, ct, neon_zetas;  // 9
+  int16x8_t a, b, c, d, at, bt, ct, my_zetas;  // 9
   int16x4_t a_lo, a_hi, b_lo, b_hi, c_lo, c_hi, d_lo, d_hi, zlo, zhi;// 8
   int16x4_t neon_zeta1, neon_zeta2, neon_zeta3, neon_zeta4, neon_v, neon_kyberq16; // 4
   int32x4_t t1, t2, t3, t4, t5, t6, t7, t8, t9, ta, tb, tc;         // 12
@@ -153,9 +153,9 @@ void unroll_neon_invntt(int16_t r[256])
     // ab.val[1] = 1, 5, 9, 13, 17, 21, 25, 29
     // ab.val[2] = 2, 6, 10, 14, 18, 22, 26, 30
     // al.val[3] = 3, 7, 11, 15, 19, 23, 27, 31
-    vload(neon_zetas, &zetas_inv[k]);
-    vlo(neon_zeta1, neon_zetas);
-    vhi(neon_zeta2, neon_zetas);
+    vload(my_zetas, &zetas_inv[k]);
+    vlo(neon_zeta1, my_zetas);
+    vhi(neon_zeta2, my_zetas);
     //
     vload4(ab, &r[j]);
 
@@ -447,7 +447,7 @@ static
 void unroll_neon_ntt(int16_t r[256])
 {
   // NEON Registers
-  int16x8_t a, b, c, d, at, bt, ct, dt, neon_zetas;         // 9
+  int16x8_t a, b, c, d, at, bt, ct, dt, my_zetas;         // 9
   int16x4_t a_lo, a_hi, b_lo, b_hi, c_lo, c_hi, d_lo, d_hi; // 8
   int16x4_t neon_zeta1, neon_zeta2, neon_zeta3, neon_zeta4; // 4
   int32x4_t t1, t2, t3, t4, t5, t6, t7, t8, t9, ta, tb, tc; // 12
@@ -634,10 +634,10 @@ void unroll_neon_ntt(int16_t r[256])
     vlo(b_lo, ab.val[3]);
     vhi(b_hi, ab.val[3]);
 
-    vload(neon_zetas, &zetas[k]);
+    vload(my_zetas, &zetas[k]);
 
-    vlo(neon_zeta1, neon_zetas);
-    vhi(neon_zeta2, neon_zetas);
+    vlo(neon_zeta1, my_zetas);
+    vhi(neon_zeta2, my_zetas);
 
     fqmul(a_lo, neon_zeta1, t1, t2, t3, neon_qinv, neon_kyberq);
     fqmul(b_lo, neon_zeta1, t4, t5, t6, neon_qinv, neon_kyberq);
@@ -689,7 +689,7 @@ int compare(int16_t *a, int16_t *b, int length, const char *string)
       }
       if (count > 8)
       {
-        printf("Incorrect!!\n");
+        printf("%s Incorrect!!\n", string);
         return 1;
       }
     }
