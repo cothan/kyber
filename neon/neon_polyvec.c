@@ -4,6 +4,7 @@
 #include "ntt.h"
 #include "polyvec.h"
 
+#define _V (((1U << 26) + KYBER_Q / 2) / KYBER_Q)
 
 /*************************************************
 * Name:        polyvec_ntt
@@ -15,7 +16,7 @@
 void neon_polyvec_ntt(polyvec *r)
 {
   unsigned int i;
-  for(i=0;i<KYBER_K;i++)
+  for (i = 0; i < KYBER_K; i++)
   {
     neon_ntt(r->vec[i].coeffs);
     neon_poly_reduce(&r->vec[i]);
@@ -33,7 +34,7 @@ void neon_polyvec_ntt(polyvec *r)
 void neon_polyvec_invntt_to_mont(polyvec *r)
 {
   unsigned int i;
-  for(i=0;i<KYBER_K;i++)
+  for (i = 0; i < KYBER_K; i++)
     neon_invntt(r->vec[i].coeffs);
 }
 
@@ -55,9 +56,11 @@ void neon_polyvec_invntt_to_mont(polyvec *r)
 *
 * Arguments:   - poly *r: pointer to input/output polynomial
 **************************************************/
-void neon_polyvec_add_reduce_csubq(polyvec *c, const polyvec *a) {
+void neon_polyvec_add_reduce_csubq(polyvec *c, const polyvec *a)
+{
   unsigned int i;
-  for (i = 0; i < KYBER_K; i++) {
+  for (i = 0; i < KYBER_K; i++)
+  {
     // c = c + a;
     // c = reduce(c);
     neon_poly_add_reduce_csubq(&c->vec[i], &a->vec[i]);
@@ -65,120 +68,50 @@ void neon_polyvec_add_reduce_csubq(polyvec *c, const polyvec *a) {
 }
 
 /**********************************/
-// Load interleave 
-#define vload2(c, ptr) c = vld2q_s16(ptr);
+// Load int16x8_t c <= ptr*
+#define vload4(c, ptr) c = vld4q_s16(ptr);
 
-// Store interleave
-#define vstore2(ptr, c) vst2q_s16(ptr, c);
-
-// Combine in16x8_t c: low | high
-#define vcombine(c, low, high) c = vcombine_s16(low, high);
-
-// c (int16x4) = a + b (int16x4)
-#define vadd4(c, a, b) c = vadd_s16(a, b);
+// Store *ptr <= c
+#define vstore4(ptr, c) vst4q_s16(ptr, c);
 
 // c (int16x8) = a + b (int16x8)
 #define vadd8(c, a, b) c = vaddq_s16(a, b);
 
-// get_low c (int16x4) = low(a) (int16x8)
-#define vlo(c, a) c = vget_low_s16(a);
+// c (int16x8) = a - b (int16x8)
+#define vsub8(c, a, b) c = vsubq_s16(a, b);
 
-// get_high c (int16x4) = high(a) (int16x8)
-#define vhi(c, a) c = vget_high_s16(a);
-
-// c = ~a
-#define vnot4(c, a) c = vmvn_s16(a);
+/* 
+out, in: int16x8_t
+zeta: input : int16x8_t
+t : int16x8x4_t
+neon_qinv: const   : int16x8_t
+neon_kyberq: const : int16x8_t
+*/
+#define fqmul(out, in, zeta, t)                                                                              \
+  t.val[0] = (int16x8_t)vmull_s16(vget_low_s16(in), vget_low_s16(zeta));                                     \
+  t.val[1] = (int16x8_t)vmull_high_s16(in, zeta);                                                            \
+  t.val[2] = vuzp1q_s16(t.val[0], t.val[1]);                                          /* a_L  */             \
+  t.val[3] = vuzp2q_s16(t.val[0], t.val[1]);                                          /* a_H  */             \
+  t.val[0] = vmulq_s16(t.val[2], neon_qinv);                                          /* a_L = a_L * QINV */ \
+  t.val[1] = (int16x8_t)vmull_s16(vget_low_s16(t.val[0]), vget_low_s16(neon_kyberq)); /* t_L = a_L * Q */    \
+  t.val[2] = (int16x8_t)vmull_high_s16(t.val[0], neon_kyberq);                        /* t_H = a_L * Q*/     \
+  t.val[0] = vuzp2q_s16(t.val[1], t.val[2]);                                          /* t_H */              \
+  out = vsubq_s16(t.val[3], t.val[0]);                                                /* t_H - a_H */
 
 /*
-inout: input/output : int16x4_t
-zeta: input : int16x4_t
-t: temp : int32x4_t
-a: temp : int32x4_t
-u: temp : int32x4_t
-neon_qinv: const   : int32x4_t
-neon_kyberq: const : int32x4_t
-
-rewrite pseudo code:
-int16_t fqmul(int16_t b, int16_t c) {
-  int32_t t, u, a;
-
-  a = (int32_t) b*c;
-  u = a * (QINV << 16);
-  u >>= 16;
-  t = u * (-KYBER_Q);
-  t += a;
-  t >>= 16;
-  return t;
-}
+reduce low and high of 
+inout: 
+int16x8_t inout, 
+t32_1, t32_2: int32x4_t 
+t16: int16x8_t 
+neon_v, neon_kyber16
 */
-#define fqmul(inout, zeta, t, a, u, neon_qinv, neon_kyberq)                    \
-  a = vmull_s16(inout, zeta);                                                  \
-  u = vmulq_s32(a, neon_qinv);                                                 \
-  u = vshrq_n_s32(u, 16);                                                      \
-  t = vmlaq_s32(a, neon_kyberq, u);                                            \
-  t = vshrq_n_s32(t, 16);                                                      \
-  inout = vmovn_s32(t);
-
-/*
-inout: int16x8_t
-t : int16x8_t
-t_lo: int16x4_t
-t_hi: int16x4_t
-t1: int32x4_t
-t2: int32x4_t
-neon_v: int16x4_t
-neon_kyberq16: int16x8_t
-
-rewrite pseudo code:
-int16_t barrett_reduce(int16_t a) {
-  int16_t t;
-  const int16_t v = ((1U << 26) + KYBER_Q / 2) / KYBER_Q;
-
-  t = (int32_t)v * a >> 26;
-  t = a + t * (-KYBER_Q);
-  return t;
-}
-*/
-#define barrett(inout, t, t_lo, t_hi, t1, t2, neon_v, neon_kyberq16)           \
-  vlo(t_lo, inout);                                                            \
-  vhi(t_hi, inout);                                                            \
-  t1 = vmull_s16(t_lo, neon_v);                                                \
-  t2 = vmull_s16(t_hi, neon_v);                                                \
-  t1 = vshrq_n_s32(t1, 26);                                                    \
-  t2 = vshrq_n_s32(t2, 26);                                                    \
-  t_lo = vmovn_s32(t1);                                                        \
-  t_hi = vmovn_s32(t2);                                                        \
-  vcombine(t, t_lo, t_hi);                                                     \
-  inout = vmlaq_s16(inout, t, neon_kyberq16);
-
-/*
-permute Coefficients
-0, 1, 2, 3, 4, 5, 6, 7, 8, 9, a, b, c, d, e, f
-Input:
-reg: int16x8x2_t: vld2q_s16(ptr)
---> vld2q_s16
-in1: 0, 2, 4, 6, 8, a, c, e
-in2: 1, 3, 5, 7, 9, b, d, f
-------->
-Output:
-out1 : int16x8_t
-out2 : int16x8_t
---> permutation inside 01 register
-out1: 0, 4, 8, c | 2, 6, a, e
-out2: 1, 5, 9, d | 3, 7, b, f
-*/
-#define transpose(out1, out2, in1, in2)                                        \
-  out1 = vtrn1q_s16(in1, in2);                                                 \
-  out2 = vtrn2q_s16(in1, in2);
-
-#define permute(out1, out2, in1, in2)                                          \
-  out1 = vuzp1q_s16(in1, in2);                                                 \
-  out2 = vuzp2q_s16(in1, in2);
-
-#define depermute(out1, out2, in1, in2)                                        \
-  out1 = vzip1q_s16(in1, in2);                                                 \
-  out2 = vzip2q_s16(in1, in2);
-
+#define barrett(inout, t, i)                                                  \
+  t.val[i] = (int16x8_t)vmull_s16(vget_low_s16(inout), vget_low_s16(neon_v)); \
+  t.val[i + 1] = (int16x8_t)vmull_high_s16(inout, neon_v);                    \
+  t.val[i] = vuzp2q_s16(t.val[i], t.val[i + 1]);                              \
+  t.val[i + 1] = vshrq_n_s16(t.val[i], 10);                                   \
+  inout = vmlsq_s16(inout, t.val[i + 1], neon_kyberq);
 
 /*************************************************
 * Name:        polyvec_pointwise_acc_montgomery
@@ -190,334 +123,162 @@ out2: 1, 5, 9, d | 3, 7, b, f
 *            - const polyvec *a: pointer to first input vector of polynomials
 *            - const polyvec *b: pointer to second input vector of polynomials
 **************************************************/
-void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, const int to_mont) {
-
-  int16x8x2_t aa, bb, sum, cc;                                           //8
-  int16x8_t ta1, ta2, ta3, ta4, 
-            tb1, tb2, tb3, tb4;                                         // 4
-  int16x4_t ta3_lo, ta3_hi, 
-            tb3_lo, tb3_hi, 
-            ta4_lo, ta4_hi,                                             // 8
-            tb4_lo, tb4_hi; 
-  int32x4_t t1, t2, t3, t4, t5, t6;                                     // 6
-  int16x4_t neon_zeta, neon_one, neon_v, 
-            neon_zeta_positive, neon_zeta_negative;                     // 5
-  int16x8_t neon_kyberq16;                                              // 1
-  int32x4_t neon_qinv, neon_kyberq;                                     // 2
+void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, const int to_mont)
+{
+  int16x8x4_t aa, bb, r, ta, tb, t;                    // 24
+  int16x8_t neon_v, neon_qinv, neon_kyberq, neon_zeta; // 4
 
   // Declare constant
-  neon_qinv = vdupq_n_s32(QINV << 16);
-  neon_kyberq = vdupq_n_s32(-KYBER_Q);
-  neon_kyberq16 = vdupq_n_s16(-KYBER_Q);
-  neon_v = vdup_n_s16(((1U << 26) + KYBER_Q / 2) / KYBER_Q);
-  neon_one = vdup_n_s16(1);
+  neon_qinv = vdupq_n_s16(QINV);
+  neon_kyberq = vdupq_n_s16(KYBER_Q);
+  neon_v = vdupq_n_s16(_V);
 
   // Scalar variable
-  unsigned int k = 64;
+  unsigned int k = 0;
   unsigned int j;
   // End
 
-  // Total possible register: Max 34 = 8+4+8+6+5+1+2, Min = 30
+  // Total possible register: Max 30;
   // 1st Iteration
-  for (j = 0; j < KYBER_N; j+=16){
+  for (j = 0; j < KYBER_N; j += 32)
+  {
     // Load Zeta
-    // 64, 65, 66, 67
-    neon_zeta_positive = vld1_s16(&zetas[k]);
-    // Convert zeta to negative sign
-    // -64, -64, -66, -67
-    vnot4(neon_zeta_negative, neon_zeta_positive);
-    vadd4(neon_zeta_negative, neon_zeta_negative, neon_one);
+    // 64, 65, 66, 67 =-= 68, 69, 70, 71
+    neon_zeta = vld1q_s16(&zetas[k]);
 
     // Use max 8 registers
-    // 0, 2, 4, 6, 8, a, c, e
-    // 1, 3, 5, 7, 9, b, d, f
-    vload2(aa, &a->vec[0].coeffs[j]);
-    vload2(bb, &b->vec[0].coeffs[j]);
+    // 0: 0, 4,  8, 12, =-=  16, 20, 24, 28
+    // 1: 1, 5,  9, 13, =-=  17, 21, 25, 29
+    // 2: 2, 6, 10, 14, =-=  18, 22, 26, 30
+    // 3: 3, 7, 11, 15, =-=  19, 23, 27, 31
+    vload4(aa, &a->vec[0].coeffs[j]);
+    vload4(bb, &b->vec[0].coeffs[j]);
 
-    // Tranpose before multiply
-    transpose(ta1, ta2, aa.val[0], aa.val[1]);
-    transpose(tb1, tb2, bb.val[0], bb.val[1]);
+    // => r.val[0] = a.val[1]*b.val[1]*zeta_pos + a.val[0] * b.val[0]
+    // => r.val[1] = a.val[0]*b.val[1] + a.val[1] * b.val[0] 
+    // => r.val[2] = a.val[3]*b.val[3]*zetas_neg + a.val[2]*b.val[2]
+    // => r.val[3] = a.val[2]*b.val[3] + a.val[3] * b.val[2]
 
-    permute(ta3, ta4, ta1, ta2);
-    permute(tb3, tb4, tb1, tb2);
+    fqmul(ta.val[0], aa.val[1], bb.val[1], t);
+    fqmul(ta.val[0], ta.val[0], neon_zeta, t);
+    fqmul(ta.val[1], aa.val[0], bb.val[1], t);
+    fqmul(ta.val[2], aa.val[3], bb.val[3], t);
+    fqmul(ta.val[2], ta.val[2], neon_zeta, t);
+    fqmul(ta.val[3], aa.val[2], bb.val[3], t);
 
-    // Do BaseMul
-    // Input: ta3, ta4, tb3, tb4
-    // t3: 0, 4, 8, 12, 2, 6, 10, 14
-    // t4: 1, 5, 9, 13, 3, 7, 11, 15
-
-    // tc3_lo = ta3[0:4] x tb3[0:4] + ta4[0:4] x tb4[0:4] x zeta_positive
-    // tc3_hi = ta3[4:8] x tb3[4:8] + ta4[4:8] x tb4[4:8] x zeta_negative
-
-    // t4_lo = ta3[0:4] x tb4[0:4] + ta4[0:4] x tb3[0:4]
-    // t4_hi = ta3[4:8] x tb4[4:8] + ta4[4:8] x tb3[4:8]
-
-    // Split fqmul
-    vlo(ta3_lo, ta3);
-    vhi(ta3_hi, ta3);
-    vlo(tb3_lo, tb3);
-    vhi(tb3_hi, tb3);
-
-    vlo(ta4_lo, ta4);
-    vhi(ta4_hi, ta4);
-    vlo(tb4_lo, tb4);
-    vhi(tb4_hi, tb4);
-
-    // ta3[0:4] x tb3[0:4]
-    // ta3[4:8] x tb3[4:8]
-    fqmul(ta3_lo, tb3_lo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(ta3_hi, tb3_hi, t4, t5, t6, neon_qinv, neon_kyberq);
-
-    // ta4[0:4] x tb4[0:4] x zeta_positive
-    // ta4[4:8] x tb4[4:8] x zeta_negative
-    fqmul(ta4_lo, tb4_lo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(ta4_hi, tb4_hi, t4, t5, t6, neon_qinv, neon_kyberq);
-    fqmul(ta4_lo, neon_zeta_positive, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(ta4_hi, neon_zeta_negative, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(tb.val[0], aa.val[0], bb.val[0], t);
+    fqmul(tb.val[1], aa.val[1], bb.val[0], t);
+    fqmul(tb.val[2], aa.val[2], bb.val[2], t);
+    fqmul(tb.val[3], aa.val[3], bb.val[2], t);
     
-    vcombine(ta1, ta3_lo, ta3_hi);
-    vcombine(ta2, ta4_lo, ta4_hi);
+    vadd8(r.val[0], ta.val[0], tb.val[0]);
+    vadd8(r.val[1], ta.val[1], tb.val[1]);
+    vsub8(r.val[2], tb.val[2], ta.val[2]);
+    vadd8(r.val[3], ta.val[3], tb.val[3]);
 
-    // tb1 = ta1 + ta2
-    vadd8(sum.val[0], ta1, ta2);
-
-    // Split fqmul
-    vlo(ta3_lo, ta3);
-    vhi(ta3_hi, ta3);
-    vlo(tb3_lo, tb3);
-    vhi(tb3_hi, tb3);
-
-    vlo(ta4_lo, ta4);
-    vhi(ta4_hi, ta4);
-    vlo(tb4_lo, tb4);
-    vhi(tb4_hi, tb4);
-
-    // ta3[0:4] x tb4[0:4]
-    // ta3[4:8] x tb4[4:8]
-    fqmul(ta3_lo, tb4_lo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(ta3_hi, tb4_hi, t4, t5, t6, neon_qinv, neon_kyberq);
-
-    // ta4[0:4] x tb3[0:4]
-    // ta4[4:8] x tb3[4:8]
-    fqmul(ta4_lo, tb3_lo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(ta4_hi, tb3_hi, t4, t5, t6, neon_qinv, neon_kyberq);
-    
-    vcombine(ta1, ta3_lo, ta3_hi);
-    vcombine(ta2, ta4_lo, ta4_hi);
-    
-    // tb2 = ta1 + ta2
-    vadd8(sum.val[1], ta1, ta2);
-    
     /***************************/
 
     // 2nd iterator
-    vload2(aa, &a->vec[1].coeffs[j]);
-    vload2(bb, &b->vec[1].coeffs[j]);
+    vload4(aa, &a->vec[1].coeffs[j]);
+    vload4(bb, &b->vec[1].coeffs[j]);
 
-    transpose(ta1, ta2, aa.val[0], aa.val[1]);
-    transpose(tb1, tb2, bb.val[0], bb.val[1]);
-
-    permute(ta3, ta4, ta1, ta2);
-    permute(tb3, tb4, tb1, tb2);
-
-    vlo(ta3_lo, ta3);
-    vhi(ta3_hi, ta3);
-    vlo(tb3_lo, tb3);
-    vhi(tb3_hi, tb3);
-
-    vlo(ta4_lo, ta4);
-    vhi(ta4_hi, ta4);
-    vlo(tb4_lo, tb4);
-    vhi(tb4_hi, tb4);
-
-    fqmul(ta3_lo, tb3_lo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(ta3_hi, tb3_hi, t4, t5, t6, neon_qinv, neon_kyberq);
-
-    fqmul(ta4_lo, tb4_lo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(ta4_hi, tb4_hi, t4, t5, t6, neon_qinv, neon_kyberq);
-    fqmul(ta4_lo, neon_zeta_positive, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(ta4_hi, neon_zeta_negative, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(ta.val[0], aa.val[1], bb.val[1], t);
+    fqmul(ta.val[0], ta.val[0], neon_zeta, t);
+    fqmul(ta.val[1], aa.val[0], bb.val[1], t);
+    fqmul(ta.val[2], aa.val[3], bb.val[3], t);
+    fqmul(ta.val[2], ta.val[2], neon_zeta, t);
+    fqmul(ta.val[3], aa.val[2], bb.val[3], t);
     
-    vcombine(ta1, ta3_lo, ta3_hi);
-    vcombine(ta2, ta4_lo, ta4_hi);
+    vadd8(r.val[0], r.val[0], ta.val[0]);
+    vadd8(r.val[1], r.val[1], ta.val[1]);
+    vsub8(r.val[2], r.val[2], ta.val[2]);
+    vadd8(r.val[3], r.val[3], ta.val[3]);
 
-    vadd8(cc.val[0], ta1, ta2);
-    vadd8(sum.val[0], sum.val[0], cc.val[0]);
-
-    vlo(ta3_lo, ta3);
-    vhi(ta3_hi, ta3);
-    vlo(tb3_lo, tb3);
-    vhi(tb3_hi, tb3);
-
-    vlo(ta4_lo, ta4);
-    vhi(ta4_hi, ta4);
-    vlo(tb4_lo, tb4);
-    vhi(tb4_hi, tb4);
-
-    fqmul(ta3_lo, tb4_lo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(ta3_hi, tb4_hi, t4, t5, t6, neon_qinv, neon_kyberq);
-
-    fqmul(ta4_lo, tb3_lo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(ta4_hi, tb3_hi, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(tb.val[0], aa.val[0], bb.val[0], t);
+    fqmul(tb.val[1], aa.val[1], bb.val[0], t);
+    fqmul(tb.val[2], aa.val[2], bb.val[2], t);
+    fqmul(tb.val[3], aa.val[3], bb.val[2], t);
     
-    vcombine(ta1, ta3_lo, ta3_hi);
-    vcombine(ta2, ta4_lo, ta4_hi);
-    
-    vadd8(cc.val[1], ta1, ta2);
-    vadd8(sum.val[1], sum.val[1], cc.val[1]);
+    vadd8(r.val[0], r.val[0], tb.val[0]);
+    vadd8(r.val[1], r.val[1], tb.val[1]);
+    vadd8(r.val[2], r.val[2], tb.val[2]);
+    vadd8(r.val[3], r.val[3], tb.val[3]);
 
     /***************************/
 
-#if KYBER_K >= 3 
+#if KYBER_K >= 3
     // 3rd iterator
-    vload2(aa, &a->vec[2].coeffs[j]);
-    vload2(bb, &b->vec[2].coeffs[j]);
+    vload4(aa, &a->vec[2].coeffs[j]);
+    vload4(bb, &b->vec[2].coeffs[j]);
 
-    transpose(ta1, ta2, aa.val[0], aa.val[1]);
-    transpose(tb1, tb2, bb.val[0], bb.val[1]);
-
-    permute(ta3, ta4, ta1, ta2);
-    permute(tb3, tb4, tb1, tb2);
-
-    vlo(ta3_lo, ta3);
-    vhi(ta3_hi, ta3);
-    vlo(tb3_lo, tb3);
-    vhi(tb3_hi, tb3);
-
-    vlo(ta4_lo, ta4);
-    vhi(ta4_hi, ta4);
-    vlo(tb4_lo, tb4);
-    vhi(tb4_hi, tb4);
-
-    fqmul(ta3_lo, tb3_lo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(ta3_hi, tb3_hi, t4, t5, t6, neon_qinv, neon_kyberq);
-
-    fqmul(ta4_lo, tb4_lo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(ta4_hi, tb4_hi, t4, t5, t6, neon_qinv, neon_kyberq);
-    fqmul(ta4_lo, neon_zeta_positive, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(ta4_hi, neon_zeta_negative, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(ta.val[0], aa.val[1], bb.val[1], t);
+    fqmul(ta.val[0], ta.val[0], neon_zeta, t);
+    fqmul(ta.val[1], aa.val[0], bb.val[1], t);
+    fqmul(ta.val[2], aa.val[3], bb.val[3], t);
+    fqmul(ta.val[2], ta.val[2], neon_zeta, t);
+    fqmul(ta.val[3], aa.val[2], bb.val[3], t);
     
-    vcombine(ta1, ta3_lo, ta3_hi);
-    vcombine(ta2, ta4_lo, ta4_hi);
+    vadd8(r.val[0], r.val[0], ta.val[0]);
+    vadd8(r.val[1], r.val[1], ta.val[1]);
+    vsub8(r.val[2], r.val[2], ta.val[2]);
+    vadd8(r.val[3], r.val[3], ta.val[3]);
 
-    vadd8(cc.val[0], ta1, ta2);
-    vadd8(sum.val[0], sum.val[0], cc.val[0]);
-
-    vlo(ta3_lo, ta3);
-    vhi(ta3_hi, ta3);
-    vlo(tb3_lo, tb3);
-    vhi(tb3_hi, tb3);
-
-    vlo(ta4_lo, ta4);
-    vhi(ta4_hi, ta4);
-    vlo(tb4_lo, tb4);
-    vhi(tb4_hi, tb4);
-
-    fqmul(ta3_lo, tb4_lo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(ta3_hi, tb4_hi, t4, t5, t6, neon_qinv, neon_kyberq);
-
-    fqmul(ta4_lo, tb3_lo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(ta4_hi, tb3_hi, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(tb.val[0], aa.val[0], bb.val[0], t);
+    fqmul(tb.val[1], aa.val[1], bb.val[0], t);
+    fqmul(tb.val[2], aa.val[2], bb.val[2], t);
+    fqmul(tb.val[3], aa.val[3], bb.val[2], t);
     
-    vcombine(ta1, ta3_lo, ta3_hi);
-    vcombine(ta2, ta4_lo, ta4_hi);
-    
-    vadd8(cc.val[1], ta1, ta2);
-    vadd8(sum.val[1], sum.val[1], cc.val[1]);
+    vadd8(r.val[0], r.val[0], tb.val[0]);
+    vadd8(r.val[1], r.val[1], tb.val[1]);
+    vadd8(r.val[2], r.val[2], tb.val[2]);
+    vadd8(r.val[3], r.val[3], tb.val[3]);
 #endif
 #if KYBER_K == 4
     // 3rd iterator
-    vload2(aa, &a->vec[3].coeffs[j]);
-    vload2(bb, &b->vec[3].coeffs[j]);
+    vload4(aa, &a->vec[3].coeffs[j]);
+    vload4(bb, &b->vec[3].coeffs[j]);
 
-    transpose(ta1, ta2, aa.val[0], aa.val[1]);
-    transpose(tb1, tb2, bb.val[0], bb.val[1]);
-
-    permute(ta3, ta4, ta1, ta2);
-    permute(tb3, tb4, tb1, tb2);
-
-    vlo(ta3_lo, ta3);
-    vhi(ta3_hi, ta3);
-    vlo(tb3_lo, tb3);
-    vhi(tb3_hi, tb3);
-
-    vlo(ta4_lo, ta4);
-    vhi(ta4_hi, ta4);
-    vlo(tb4_lo, tb4);
-    vhi(tb4_hi, tb4);
-
-    fqmul(ta3_lo, tb3_lo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(ta3_hi, tb3_hi, t4, t5, t6, neon_qinv, neon_kyberq);
-
-    fqmul(ta4_lo, tb4_lo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(ta4_hi, tb4_hi, t4, t5, t6, neon_qinv, neon_kyberq);
-    fqmul(ta4_lo, neon_zeta_positive, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(ta4_hi, neon_zeta_negative, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(ta.val[0], aa.val[1], bb.val[1], t);
+    fqmul(ta.val[0], ta.val[0], neon_zeta, t);
+    fqmul(ta.val[1], aa.val[0], bb.val[1], t);
+    fqmul(ta.val[2], aa.val[3], bb.val[3], t);
+    fqmul(ta.val[2], ta.val[2], neon_zeta, t);
+    fqmul(ta.val[3], aa.val[2], bb.val[3], t);
     
-    vcombine(ta1, ta3_lo, ta3_hi);
-    vcombine(ta2, ta4_lo, ta4_hi);
+    vadd8(r.val[0], r.val[0], ta.val[0]);
+    vadd8(r.val[1], r.val[1], ta.val[1]);
+    vsub8(r.val[2], r.val[2], ta.val[2]);
+    vadd8(r.val[3], r.val[3], ta.val[3]);
 
-    vadd8(cc.val[0], ta1, ta2);
-    vadd8(sum.val[0], sum.val[0], cc.val[0]);
-
-    vlo(ta3_lo, ta3);
-    vhi(ta3_hi, ta3);
-    vlo(tb3_lo, tb3);
-    vhi(tb3_hi, tb3);
-
-    vlo(ta4_lo, ta4);
-    vhi(ta4_hi, ta4);
-    vlo(tb4_lo, tb4);
-    vhi(tb4_hi, tb4);
-
-    fqmul(ta3_lo, tb4_lo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(ta3_hi, tb4_hi, t4, t5, t6, neon_qinv, neon_kyberq);
-
-    fqmul(ta4_lo, tb3_lo, t1, t2, t3, neon_qinv, neon_kyberq);
-    fqmul(ta4_hi, tb3_hi, t4, t5, t6, neon_qinv, neon_kyberq);
+    fqmul(tb.val[0], aa.val[0], bb.val[0], t);
+    fqmul(tb.val[1], aa.val[1], bb.val[0], t);
+    fqmul(tb.val[2], aa.val[2], bb.val[2], t);
+    fqmul(tb.val[3], aa.val[3], bb.val[2], t);
     
-    vcombine(ta1, ta3_lo, ta3_hi);
-    vcombine(ta2, ta4_lo, ta4_hi);
-    
-    vadd8(cc.val[1], ta1, ta2);
-    vadd8(sum.val[1], sum.val[1], cc.val[1]);
+    vadd8(r.val[0], r.val[0], tb.val[0]);
+    vadd8(r.val[1], r.val[1], tb.val[1]);
+    vadd8(r.val[2], r.val[2], tb.val[2]);
+    vadd8(r.val[3], r.val[3], tb.val[3]);
 #endif
 
-   // Do poly_reduce:   poly_reduce(r);
-    barrett(sum.val[0], cc.val[0], ta3_lo, ta3_hi, t1, t2, neon_v, neon_kyberq16);
-    barrett(sum.val[1], cc.val[1], tb3_lo, tb3_hi, t3, t4, neon_v, neon_kyberq16);
+    // Do poly_reduce:   poly_reduce(r);
+    barrett(r.val[0], t, 0);
+    barrett(r.val[1], t, 2);
+    barrett(r.val[2], t, 0);
+    barrett(r.val[3], t, 2);
 
     if (to_mont)
     {
-      neon_zeta = vdup_n_s16(((1ULL << 32) % KYBER_Q));
+      neon_zeta = vdupq_n_s16(((1ULL << 32) % KYBER_Q));
 
       // Split fqmul
-      vlo(ta3_lo, sum.val[0]);
-      vhi(ta3_hi, sum.val[0]);
-      vlo(ta4_lo, sum.val[1]);
-      vhi(ta4_hi, sum.val[1]);
-
-      fqmul(ta3_lo, neon_zeta, t1, t2, t3, neon_qinv, neon_kyberq);
-      fqmul(ta3_hi, neon_zeta, t4, t5, t6, neon_qinv, neon_kyberq);
-      fqmul(ta4_lo, neon_zeta, t1, t2, t3, neon_qinv, neon_kyberq);
-      fqmul(ta4_hi, neon_zeta, t4, t5, t6, neon_qinv, neon_kyberq);
-      
-      vcombine(sum.val[0], ta3_lo, ta3_hi);
-      vcombine(sum.val[1], ta4_lo, ta4_hi);
+      fqmul(r.val[0], r.val[0], neon_zeta, t);
+      fqmul(r.val[1], r.val[1], neon_zeta, t);
+      fqmul(r.val[2], r.val[2], neon_zeta, t);
+      fqmul(r.val[3], r.val[3], neon_zeta, t);
     }
 
-    // Tranpose before store back to memory
-    // tb1: 0, 4, 8, 12, 2, 6, 10, 14
-    // tb2: 1, 5, 9, 13, 3, 7, 11, 15
-    depermute(tb1, tb2, sum.val[0], sum.val[1]);
-
-    // tb3: 0, 1, 4, 5, 8, 9, 12, 13
-    // tb4: 2, 3, 6, 7, 10, 11, 14, 15
-    transpose(sum.val[0], sum.val[1], tb1, tb2);
-
-    // 0, 2, 4, 6, 8, a, c, e
-    // 1, 3, 5, 7, 9, b, d, f
-    vstore2(&c->coeffs[j], sum);
-    k+=4;
+    vstore4(&c->coeffs[j], r);
+    k += 8;
   }
 }

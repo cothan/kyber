@@ -4,116 +4,80 @@
 #include "symmetric.h"
 #include "cbd.h"
 
-
 // Load int16x8x4_t c <= ptr*
 #define vloadx4(c, ptr) c = vld1q_s16_x4(ptr);
 
 // Load int16x8x4_t c <= ptr*
 #define vstorex4(ptr, c) vst1q_s16_x4(ptr, c);
 
-// Combine in16x8_t c: low | high
-#define vcombine(c, low, high) c = vcombine_s16(low, high);
-
 // c (int16x8) = a + b (int16x8)
 #define vadd(c, a, b) c = vaddq_s16(a, b);
 
 // c (int16x8) = a + b (int16x8)
-#define vand(c, a, b) c = vandq_s16((int16x8_t) a, b);
+#define vand(c, a, b) c = vandq_s16((int16x8_t)a, b);
 
 // c (int16x8) = a - b (int16x8)
 #define vsub(c, a, b) c = vsubq_s16(a, b);
 
-// get_low c (int16x4) = low(a) (int16x8)
-#define vlo(c, a) c = vget_low_s16(a);
-
-// get_high c (int16x4) = high(a) (int16x8)
-#define vhi(c, a) c = vget_high_s16(a);
-
-// compare greater than or equal 
+// compare greater than or equal
 #define vcompare(out, a, const_n) out = vcgeq_s16(a, const_n);
 
-// SHIFT U16x8 c = a >> nb
-#define vsr(c, a, n) c = vshrq_n_u16(a, n);
-
 /*
-inout: int16x8_t
-t : int16x8_t
-t_lo: int16x4_t
-t_hi: int16x4_t
-t1: int32x4_t
-t2: int32x4_t
-neon_v: int16x8_t
-neon_kyberq16: int16x8_t
-
-rewrite pseudo code:
-int16_t barrett_reduce(int16_t a) {
-  int16_t t;
-  const int16_t v = ((1U << 26) + KYBER_Q / 2) / KYBER_Q;
-
-  t = (int32_t)v * a >> 26;
-  t = a + t * (-KYBER_Q);
-  return t;
-}
+reduce low and high of 
+inout: 
+int16x8_t inout, 
+t32_1, t32_2: int32x4_t 
+t16: int16x8_t 
+neon_v, neon_kyber16
 */
-#define barrett(inout, t, t_lo, t_hi, t1, t2, neon_v, neon_kyberq16)           \
-  vlo(t_lo, inout);                                                            \
-  vhi(t_hi, inout);                                                            \
-  t1 = vmull_s16(t_lo, neon_v);                                                \
-  t2 = vmull_s16(t_hi, neon_v);                                                \
-  t1 = vshrq_n_s32(t1, 26);                                                    \
-  t2 = vshrq_n_s32(t2, 26);                                                    \
-  t_lo = vmovn_s32(t1);                                                        \
-  t_hi = vmovn_s32(t2);                                                        \
-  vcombine(t, t_lo, t_hi);                                                     \
-  inout = vmlaq_s16(inout, t, neon_kyberq16);
+#define barrett(inout, t, i)                                                  \
+  t.val[i] = (int16x8_t)vmull_s16(vget_low_s16(inout), vget_low_s16(neon_v)); \
+  t.val[i + 1] = (int16x8_t)vmull_high_s16(inout, neon_v);                    \
+  t.val[i] = vuzp2q_s16(t.val[i], t.val[i + 1]);                              \
+  t.val[i + 1] = vshrq_n_s16(t.val[i], 10);                                   \
+  inout = vmlsq_s16(inout, t.val[i + 1], neon_kyberq);
 
+void neon_poly_reduce(poly *c)
+{
+  int16x8x4_t cc, t;             // 8
+  int16x8_t neon_v, neon_kyberq; // 2
 
-void neon_poly_reduce(poly *c) {
-  int16x8x4_t cc, aa;                                                   // 4
-  int16x8_t neon_kyberq16;                                  // 2
-  int16x4_t neon_v;
-  int16x4_t t0_lo, t0_hi, t1_lo, t1_hi, t2_lo, t2_hi, t3_lo, t3_hi; // 8
-  int32x4_t t01, t02, t11, t12, t21, t22, t31, t32;                 // 8
+  neon_kyberq = vdupq_n_s16(KYBER_Q);
+  neon_v = vdupq_n_s16(((1U << 26) + KYBER_Q / 2) / KYBER_Q);
 
-  neon_kyberq16 = vdupq_n_s16(-KYBER_Q);
-  neon_v = vdup_n_s16(((1U << 26) + KYBER_Q / 2) / KYBER_Q);
-
-  // Total register: 22 registers.
-  unsigned int i;
-  for (i = 0; i < KYBER_N; i += 32) {
+  // Total register: 18 registers.
+  for (int i = 0; i < KYBER_N; i += 32)
+  {
     vloadx4(cc, &c->coeffs[i]);
 
     // c = reduce(c)
-    barrett(cc.val[0], aa.val[0], t0_lo, t0_hi, t01, t02, neon_v, neon_kyberq16);
-    barrett(cc.val[1], aa.val[1], t1_lo, t1_hi, t11, t12, neon_v, neon_kyberq16);
-    barrett(cc.val[2], aa.val[2], t2_lo, t2_hi, t21, t22, neon_v, neon_kyberq16);
-    barrett(cc.val[3], aa.val[3], t3_lo, t3_hi, t31, t32, neon_v, neon_kyberq16);
+    barrett(cc.val[0], t, 0);
+    barrett(cc.val[1], t, 2);
+    barrett(cc.val[2], t, 0);
+    barrett(cc.val[3], t, 2);
 
     // c = t;
     vstorex4(&c->coeffs[i], cc);
   }
 }
 
-
 /*
 c = c + a
 c = reduce(c)
 */
-void neon_poly_add_reduce_csubq(poly *c, const poly *a) {
-  int16x8x4_t cc, aa;                                               // 8
-  uint16x8x4_t res;
-  int16x8_t neon_kyberq16, const_kyberq;                            // 2
-  int16x4_t neon_v;
-  int16x4_t t0_lo, t0_hi, t1_lo, t1_hi, t2_lo, t2_hi, t3_lo, t3_hi; // 8
-  int32x4_t t01, t02, t11, t12, t21, t22, t31, t32;                 // 8
+void neon_poly_add_reduce_csubq(poly *c, const poly *a)
+{
+  int16x8x4_t cc, aa, t;         // 8
+  uint16x8x4_t res;              // 4
+  int16x8_t neon_v, neon_kyberq; // 2
 
-  neon_kyberq16 = vdupq_n_s16(-KYBER_Q);
-  const_kyberq = vdupq_n_s16(KYBER_Q);
-  neon_v = vdup_n_s16(((1U << 26) + KYBER_Q / 2) / KYBER_Q);
+  neon_kyberq = vdupq_n_s16(KYBER_Q);
+  neon_v = vdupq_n_s16(((1U << 26) + KYBER_Q / 2) / KYBER_Q);
 
   // Total register: 26 registers.
   unsigned int i;
-  for (i = 0; i < KYBER_N; i += 32) {
+  for (i = 0; i < KYBER_N; i += 32)
+  {
     vloadx4(aa, &a->coeffs[i]);
     vloadx4(cc, &c->coeffs[i]);
 
@@ -124,23 +88,23 @@ void neon_poly_add_reduce_csubq(poly *c, const poly *a) {
     vadd(cc.val[3], cc.val[3], aa.val[3]);
 
     // c = reduce(c)
-    barrett(cc.val[0], aa.val[0], t0_lo, t0_hi, t01, t02, neon_v, neon_kyberq16);
-    barrett(cc.val[1], aa.val[1], t1_lo, t1_hi, t11, t12, neon_v, neon_kyberq16);
-    barrett(cc.val[2], aa.val[2], t2_lo, t2_hi, t21, t22, neon_v, neon_kyberq16);
-    barrett(cc.val[3], aa.val[3], t3_lo, t3_hi, t31, t32, neon_v, neon_kyberq16);
+    barrett(cc.val[0], t, 0);
+    barrett(cc.val[1], t, 2);
+    barrett(cc.val[2], t, 0);
+    barrett(cc.val[3], t, 2);
 
     // c = csubq(c)
     // res = 0xffff if cc >= kyber_q else 0
-    vcompare(res.val[0], cc.val[0], const_kyberq);
-    vcompare(res.val[1], cc.val[1], const_kyberq);
-    vcompare(res.val[2], cc.val[2], const_kyberq);
-    vcompare(res.val[3], cc.val[3], const_kyberq);
+    vcompare(res.val[0], cc.val[0], neon_kyberq);
+    vcompare(res.val[1], cc.val[1], neon_kyberq);
+    vcompare(res.val[2], cc.val[2], neon_kyberq);
+    vcompare(res.val[3], cc.val[3], neon_kyberq);
 
     // res = res & kyber_q
-    vand(aa.val[0], res.val[0], const_kyberq);
-    vand(aa.val[1], res.val[1], const_kyberq);
-    vand(aa.val[2], res.val[2], const_kyberq);
-    vand(aa.val[3], res.val[3], const_kyberq);
+    vand(aa.val[0], res.val[0], neon_kyberq);
+    vand(aa.val[1], res.val[1], neon_kyberq);
+    vand(aa.val[2], res.val[2], neon_kyberq);
+    vand(aa.val[3], res.val[3], neon_kyberq);
 
     // c = c - a;
     vsub(cc.val[0], cc.val[0], aa.val[0]);
@@ -153,22 +117,18 @@ void neon_poly_add_reduce_csubq(poly *c, const poly *a) {
   }
 }
 
-
 /*
 c = c - a
 c = reduce(c)
 */
-void neon_poly_sub_reduce_csubq(poly *c, const poly *a) {
-  int16x8x4_t cc, aa; // 8
-  uint16x8x4_t res;
-  int16x8_t neon_kyberq16, const_kyberq;
-  int16x4_t neon_v;                                                 // 2
-  int16x4_t t0_lo, t0_hi, t1_lo, t1_hi, t2_lo, t2_hi, t3_lo, t3_hi; // 8
-  int32x4_t t01, t02, t11, t12, t21, t22, t31, t32;                 // 8
+void neon_poly_sub_reduce_csubq(poly *c, const poly *a)
+{
+  int16x8x4_t cc, aa, t;         // 8
+  uint16x8x4_t res;              // 4
+  int16x8_t neon_v, neon_kyberq; // 2
 
-  neon_kyberq16 = vdupq_n_s16(-KYBER_Q);
-  const_kyberq = vdupq_n_s16(KYBER_Q);
-  neon_v = vdup_n_s16(((1U << 26) + KYBER_Q / 2) / KYBER_Q);
+  neon_kyberq = vdupq_n_s16(KYBER_Q);
+  neon_v = vdupq_n_s16(((1U << 26) + KYBER_Q / 2) / KYBER_Q);
 
   // Total register: 26 registers.
   unsigned int i;
@@ -184,23 +144,23 @@ void neon_poly_sub_reduce_csubq(poly *c, const poly *a) {
     vsub(cc.val[3], cc.val[3], aa.val[3]);
 
     // c = reduce(c)
-    barrett(cc.val[0], aa.val[0], t0_lo, t0_hi, t01, t02, neon_v, neon_kyberq16);
-    barrett(cc.val[1], aa.val[1], t1_lo, t1_hi, t11, t12, neon_v, neon_kyberq16);
-    barrett(cc.val[2], aa.val[2], t2_lo, t2_hi, t21, t22, neon_v, neon_kyberq16);
-    barrett(cc.val[3], aa.val[3], t3_lo, t3_hi, t31, t32, neon_v, neon_kyberq16);
+    barrett(cc.val[0], t, 0);
+    barrett(cc.val[1], t, 2);
+    barrett(cc.val[2], t, 0);
+    barrett(cc.val[3], t, 2);
 
     // c = csubq(c)
     // res = 0xffff if cc >= kyber_q else 0
-    vcompare(res.val[0], cc.val[0], const_kyberq);
-    vcompare(res.val[1], cc.val[1], const_kyberq);
-    vcompare(res.val[2], cc.val[2], const_kyberq);
-    vcompare(res.val[3], cc.val[3], const_kyberq);
+    vcompare(res.val[0], cc.val[0], neon_kyberq);
+    vcompare(res.val[1], cc.val[1], neon_kyberq);
+    vcompare(res.val[2], cc.val[2], neon_kyberq);
+    vcompare(res.val[3], cc.val[3], neon_kyberq);
 
     // res = res & kyber_q
-    vand(aa.val[0], res.val[0], const_kyberq);
-    vand(aa.val[1], res.val[1], const_kyberq);
-    vand(aa.val[2], res.val[2], const_kyberq);
-    vand(aa.val[3], res.val[3], const_kyberq);
+    vand(aa.val[0], res.val[0], neon_kyberq);
+    vand(aa.val[1], res.val[1], neon_kyberq);
+    vand(aa.val[2], res.val[2], neon_kyberq);
+    vand(aa.val[3], res.val[3], neon_kyberq);
 
     // c = c - a;
     vsub(cc.val[0], cc.val[0], aa.val[0]);
@@ -217,17 +177,14 @@ void neon_poly_sub_reduce_csubq(poly *c, const poly *a) {
 c = c + a + b
 c = reduce(c)
 */
-void neon_poly_add_add_reduce_csubq(poly *c, const poly *a, const poly *b) {
-  int16x8x4_t cc, aa, bb; // 12
-  uint16x8x4_t res;
-  int16x8_t neon_kyberq16, const_kyberq;
-  int16x4_t neon_v;                                                 // 2
-  int16x4_t t0_lo, t0_hi, t1_lo, t1_hi, t2_lo, t2_hi, t3_lo, t3_hi; // 8
-  int32x4_t t01, t02, t11, t12, t21, t22, t31, t32;                 // 8
+void neon_poly_add_add_reduce_csubq(poly *c, const poly *a, const poly *b)
+{
+  int16x8x4_t cc, aa, bb, t;        // 16
+  uint16x8x4_t res;              // 4
+  int16x8_t neon_v, neon_kyberq; // 3
 
-  neon_kyberq16 = vdupq_n_s16(-KYBER_Q);
-  const_kyberq = vdupq_n_s16(KYBER_Q);
-  neon_v = vdup_n_s16(((1U << 26) + KYBER_Q / 2) / KYBER_Q);
+  neon_kyberq = vdupq_n_s16(KYBER_Q);
+  neon_v = vdupq_n_s16(((1U << 26) + KYBER_Q / 2) / KYBER_Q);
 
   // Total register: 30 registers.
   unsigned int i;
@@ -250,23 +207,23 @@ void neon_poly_add_add_reduce_csubq(poly *c, const poly *a, const poly *b) {
     vadd(cc.val[3], cc.val[3], aa.val[3]);
 
     // c = reduce(c)
-    barrett(cc.val[0], bb.val[0], t0_lo, t0_hi, t01, t02, neon_v, neon_kyberq16);
-    barrett(cc.val[1], bb.val[1], t1_lo, t1_hi, t11, t12, neon_v, neon_kyberq16);
-    barrett(cc.val[2], bb.val[2], t2_lo, t2_hi, t21, t22, neon_v, neon_kyberq16);
-    barrett(cc.val[3], bb.val[3], t3_lo, t3_hi, t31, t32, neon_v, neon_kyberq16);
+    barrett(cc.val[0], t, 0);
+    barrett(cc.val[1], t, 2);
+    barrett(cc.val[2], t, 0);
+    barrett(cc.val[3], t, 2);
 
     // c = csubq(c)
     // res = 0xffff if cc >= kyber_q else 0
-    vcompare(res.val[0], cc.val[0], const_kyberq);
-    vcompare(res.val[1], cc.val[1], const_kyberq);
-    vcompare(res.val[2], cc.val[2], const_kyberq);
-    vcompare(res.val[3], cc.val[3], const_kyberq);
+    vcompare(res.val[0], cc.val[0], neon_kyberq);
+    vcompare(res.val[1], cc.val[1], neon_kyberq);
+    vcompare(res.val[2], cc.val[2], neon_kyberq);
+    vcompare(res.val[3], cc.val[3], neon_kyberq);
 
     // res = res & kyber_q
-    vand(aa.val[0], res.val[0], const_kyberq);
-    vand(aa.val[1], res.val[1], const_kyberq);
-    vand(aa.val[2], res.val[2], const_kyberq);
-    vand(aa.val[3], res.val[3], const_kyberq);
+    vand(aa.val[0], res.val[0], neon_kyberq);
+    vand(aa.val[1], res.val[1], neon_kyberq);
+    vand(aa.val[2], res.val[2], neon_kyberq);
+    vand(aa.val[3], res.val[3], neon_kyberq);
 
     // c = c - a;
     vsub(cc.val[0], cc.val[0], aa.val[0]);
@@ -283,31 +240,31 @@ void neon_poly_getnoise_eta1_2x(poly *vec1, poly *vec2,
                                 const uint8_t seed[KYBER_SYMBYTES],
                                 uint8_t nonce1, uint8_t nonce2)
 {
-    uint8_t buf1[KYBER_ETA1 * KYBER_N / 4],
-            buf2[KYBER_ETA1 * KYBER_N / 4];
-    neon_prf(buf1, buf2, sizeof(buf1), seed, nonce1, nonce2);
-    cbd_eta1(vec1, buf1);
-    cbd_eta1(vec2, buf2);
+  uint8_t buf1[KYBER_ETA1 * KYBER_N / 4],
+      buf2[KYBER_ETA1 * KYBER_N / 4];
+  neon_prf(buf1, buf2, sizeof(buf1), seed, nonce1, nonce2);
+  cbd_eta1(vec1, buf1);
+  cbd_eta1(vec2, buf2);
 }
 
 void neon_poly_getnoise_eta2_2x(poly *vec1, poly *vec2,
                                 const uint8_t seed[KYBER_SYMBYTES],
                                 uint8_t nonce1, uint8_t nonce2)
 {
-    uint8_t buf1[KYBER_ETA2 * KYBER_N / 4],
-            buf2[KYBER_ETA2 * KYBER_N / 4];
-    neon_prf(buf1, buf2, sizeof(buf1), seed, nonce1, nonce2);
-    cbd_eta2(vec1, buf1);
-    cbd_eta2(vec2, buf2);
+  uint8_t buf1[KYBER_ETA2 * KYBER_N / 4],
+      buf2[KYBER_ETA2 * KYBER_N / 4];
+  neon_prf(buf1, buf2, sizeof(buf1), seed, nonce1, nonce2);
+  cbd_eta2(vec1, buf1);
+  cbd_eta2(vec2, buf2);
 }
 
 void neon_poly_getnoise_eta2(poly *r,
                              const uint8_t seed[KYBER_SYMBYTES],
                              uint8_t nonce)
 {
-    uint8_t buf[KYBER_ETA2 * KYBER_N / 4];
-    prf(buf, sizeof(buf), seed, nonce);
-    cbd_eta2(r, buf);
+  uint8_t buf[KYBER_ETA2 * KYBER_N / 4];
+  prf(buf, sizeof(buf), seed, nonce);
+  cbd_eta2(r, buf);
 }
 
 /*************************************************
@@ -327,7 +284,7 @@ void poly_csubq(poly *r)
 
   const_kyberq = vdupq_n_s16(KYBER_Q);
 
-  for (unsigned int i = 0; i < KYBER_N; i+=32)
+  for (unsigned int i = 0; i < KYBER_N; i += 32)
   {
     vloadx4(cc, &r->coeffs[i]);
     // res = 0xffff if cc >= kyber_q else 0
@@ -351,7 +308,6 @@ void poly_csubq(poly *r)
     vstorex4(&r->coeffs[i], cc);
   }
 }
-
 
 /*************************************************
 * Name:        poly_frombytes
