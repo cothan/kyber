@@ -8,6 +8,40 @@
 // clang ntt.c reduce.c neon_ntt.c speed_ntt.c -o neon_ntt -O3 -g3 -Wall -Werror -Wextra -Wpedantic -lpapi
 // gcc   ntt.c reduce.c neon_ntt.c speed_ntt.c -o neon_ntt -O3 -g3 -Wall -Werror -Wextra -Wpedantic -lpapi
 
+static
+const int16_t ref_zetas[128] = {
+  2285, 2571, 2970, 1812, 1493, 1422, 287, 202, 
+  3158, 622, 1577, 182, 962, 2127, 1855, 1468, 
+  573, 2004, 264, 383, 2500, 1458, 1727, 3199, 
+  2648, 1017, 732, 608, 1787, 411, 3124, 1758, 
+  1223, 652, 2777, 1015, 2036, 1491, 3047, 1785, 
+  516, 3321, 3009, 2663, 1711, 2167, 126, 1469, 
+  2476, 3239, 3058, 830, 107, 1908, 3082, 2378, 
+  2931, 961, 1821, 2604, 448, 2264, 677, 2054, 
+  2226, 430, 555, 843, 2078, 871, 1550, 105, 
+  422, 587, 177, 3094, 3038, 2869, 1574, 1653, 
+  3083, 778, 1159, 3182, 2552, 1483, 2727, 1119, 
+  1739, 644, 2457, 349, 418, 329, 3173, 3254, 
+  817, 1097, 603, 610, 1322, 2044, 1864, 384, 
+  2114, 3193, 1218, 1994, 2455, 220, 2142, 1670, 
+  2144, 1799, 2051, 794, 1819, 2475, 2459, 478, 
+  3221, 3021, 996, 991, 958, 1869, 1522, 1628
+};
+
+static 
+const int16_t ref_zetas_inv[128] = {
+  1701, 1807, 1460, 2371, 2338, 2333, 308, 108, 2851, 870, 854, 1510, 2535,
+  1278, 1530, 1185, 1659, 1187, 3109, 874, 1335, 2111, 136, 1215, 2945, 1465,
+  1285, 2007, 2719, 2726, 2232, 2512, 75, 156, 3000, 2911, 2980, 872, 2685,
+  1590, 2210, 602, 1846, 777, 147, 2170, 2551, 246, 1676, 1755, 460, 291, 235,
+  3152, 2742, 2907, 3224, 1779, 2458, 1251, 2486, 2774, 2899, 1103, 1275, 2652,
+  1065, 2881, 725, 1508, 2368, 398, 951, 247, 1421, 3222, 2499, 271, 90, 853,
+  1860, 3203, 1162, 1618, 666, 320, 8, 2813, 1544, 282, 1838, 1293, 2314, 552,
+  2677, 2106, 1571, 205, 2918, 1542, 2721, 2597, 2312, 681, 130, 1602, 1871,
+  829, 2946, 3065, 1325, 2756, 1861, 1474, 1202, 2367, 3147, 1752, 2707, 171,
+  3127, 3042, 1907, 1836, 1517, 359, 758, 1441
+};
+
 /******8888888888888888888888888***************/
 
 // Load int16x8_t c <= ptr*
@@ -153,7 +187,7 @@ void unroll_neon_invntt(int16_t r[256])
     // ab.val[1] = 1, 5, 9, 13, 17, 21, 25, 29
     // ab.val[2] = 2, 6, 10, 14, 18, 22, 26, 30
     // al.val[3] = 3, 7, 11, 15, 19, 23, 27, 31
-    vload(my_zetas, &zetas_inv[k]);
+    vload(my_zetas, &ref_zetas_inv[k]);
     vlo(neon_zeta1, my_zetas);
     vhi(neon_zeta2, my_zetas);
     //
@@ -197,8 +231,8 @@ void unroll_neon_invntt(int16_t r[256])
   //   Layer 2
   for (j = 0; j < 256; j += 32)
   {
-    vdup(neon_zeta1, zetas_inv[k++]);
-    vdup(neon_zeta2, zetas_inv[k++]);
+    vdup(neon_zeta1, ref_zetas_inv[k++]);
+    vdup(neon_zeta2, ref_zetas_inv[k++]);
     //
     //   a_lo - a_hi,
     //   b_lo - b_hi,
@@ -244,8 +278,8 @@ void unroll_neon_invntt(int16_t r[256])
     aa.val[1] = b;
     vstorex2(&r[j], aa);
 
-    vdup(neon_zeta3, zetas_inv[k++]);
-    vdup(neon_zeta4, zetas_inv[k++]);
+    vdup(neon_zeta3, ref_zetas_inv[k++]);
+    vdup(neon_zeta4, ref_zetas_inv[k++]);
 
     vloadx2(bb, &r[j + 16]);
     c = bb.val[0];
@@ -287,7 +321,7 @@ void unroll_neon_invntt(int16_t r[256])
   for (j = 0; j < 256; j += 32)
   {
     //   a - b, c - d
-    vdup(neon_zeta1, zetas_inv[k++]);
+    vdup(neon_zeta1, ref_zetas_inv[k++]);
     //
     vloadx2(aa, &r[j]);
     a = aa.val[0];
@@ -311,7 +345,7 @@ void unroll_neon_invntt(int16_t r[256])
     aa.val[1] = b;
     vstorex2(&r[j], aa);
     //
-    vdup(neon_zeta2, zetas_inv[k++]);
+    vdup(neon_zeta2, ref_zetas_inv[k++]);
     //
     vloadx2(bb, &r[j + 16]);
     c = bb.val[0];
@@ -345,7 +379,7 @@ void unroll_neon_invntt(int16_t r[256])
   {
     for (start = 0; start < 256; start = j + len)
     {
-      vdup(neon_zeta1, zetas_inv[k++]);
+      vdup(neon_zeta1, ref_zetas_inv[k++]);
       for (j = start; j < start + len; j += 16)
       {
         //   a - c, b - d
@@ -411,7 +445,7 @@ void unroll_neon_invntt(int16_t r[256])
     }
   }
 
-  vdup(neon_zeta1, zetas_inv[127]);
+  vdup(neon_zeta1, ref_zetas_inv[127]);
   for (j = 0; j < 256; j += 32)
   {
     vloadx4(ab, &r[j]);
@@ -468,7 +502,7 @@ void unroll_neon_ntt(int16_t r[256])
   {
     for (start = 0; start < 256; start = j + len)
     {
-      vdup(neon_zeta1, zetas[k++]);
+      vdup(neon_zeta1, ref_zetas[k++]);
       for (j = start; j < start + len; j += 16)
       {
         //   a - c, b - d
@@ -528,8 +562,8 @@ void unroll_neon_ntt(int16_t r[256])
     vlo(d_lo, d);
     vhi(d_hi, d);
 
-    vdup(neon_zeta1, zetas[k++]);
-    vdup(neon_zeta2, zetas[k++]);
+    vdup(neon_zeta1, ref_zetas[k++]);
+    vdup(neon_zeta2, ref_zetas[k++]);
 
     fqmul(b_lo, neon_zeta1, t1, t2, t3, neon_qinv, neon_kyberq);
     fqmul(b_hi, neon_zeta1, t4, t5, t6, neon_qinv, neon_kyberq);
@@ -577,8 +611,8 @@ void unroll_neon_ntt(int16_t r[256])
     vlo(b_lo, b);
     vhi(b_hi, b);
 
-    vdup(neon_zeta1, zetas[k++]);
-    vdup(neon_zeta2, zetas[k++]);
+    vdup(neon_zeta1, ref_zetas[k++]);
+    vdup(neon_zeta2, ref_zetas[k++]);
 
     fqmul(a_hi, neon_zeta1, t1, t2, t3, neon_qinv, neon_kyberq);
     fqmul(b_hi, neon_zeta2, t4, t5, t6, neon_qinv, neon_kyberq);
@@ -598,8 +632,8 @@ void unroll_neon_ntt(int16_t r[256])
     vlo(d_lo, d);
     vhi(d_hi, d);
 
-    vdup(neon_zeta3, zetas[k++]);
-    vdup(neon_zeta4, zetas[k++]);
+    vdup(neon_zeta3, ref_zetas[k++]);
+    vdup(neon_zeta4, ref_zetas[k++]);
 
     fqmul(c_hi, neon_zeta3, t6, t7, t8, neon_qinv, neon_kyberq);
     fqmul(d_hi, neon_zeta4, t9, ta, tb, neon_qinv, neon_kyberq);
@@ -634,7 +668,7 @@ void unroll_neon_ntt(int16_t r[256])
     vlo(b_lo, ab.val[3]);
     vhi(b_hi, ab.val[3]);
 
-    vload(my_zetas, &zetas[k]);
+    vload(my_zetas, &ref_zetas[k]);
 
     vlo(neon_zeta1, my_zetas);
     vhi(neon_zeta2, my_zetas);
@@ -715,7 +749,7 @@ void ntt(int16_t r[256]) {
   k = 1;
   for(len = 128; len >= 2; len >>= 1) {
     for(start = 0; start < 256; start = j + len) {
-      zeta = zetas[k++];
+      zeta = ref_zetas[k++];
       for(j = start; j < start + len; ++j) {
         t = fqmul1(zeta, r[j + len]);
         r[j + len] = r[j] - t;
@@ -733,7 +767,7 @@ void invntt(int16_t r[256]) {
   k = 0;
   for(len = 2; len <= 128; len <<= 1) {
     for(start = 0; start < 256; start = j + len) {
-      zeta = zetas_inv[k++];
+      zeta = ref_zetas_inv[k++];
       for(j = start; j < start + len; ++j) {
         t = r[j];
         r[j] = barrett_reduce(t + r[j + len]);
@@ -744,7 +778,7 @@ void invntt(int16_t r[256]) {
   }
 
   for(j = 0; j < 256; ++j)
-    r[j] = fqmul1(r[j], zetas_inv[127]);
+    r[j] = fqmul1(r[j], ref_zetas_inv[127]);
 }
 
 #include <sys/random.h>
