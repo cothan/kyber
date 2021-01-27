@@ -26,6 +26,7 @@ neon/test_speed512keccak
 neon/test_speed768keccak
 neon/test_speed1024keccak
 neon/autobuild
+neon/test.c
 ref/test_speed512keccak
 ref/test_speed768keccak
 ref/test_speed1024keccak
