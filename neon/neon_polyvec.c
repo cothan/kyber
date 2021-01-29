@@ -134,8 +134,8 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
   neon_v = vdupq_n_s16(_V);
 
   // Scalar variable
-  unsigned int k = 0;
-  unsigned int j;
+  unsigned int k = 80;
+  unsigned int j, i;
   // End
 
   // Total possible register: Max 30;
@@ -144,7 +144,7 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
   {
     // Load Zeta
     // 64, 65, 66, 67 =-= 68, 69, 70, 71
-    neon_zeta = vld1q_s16(&zetas[k]);
+    neon_zeta = vld1q_s16(&neon_zetas[k]);
 
     // Use max 8 registers
     // 0: 0, 4,  8, 12, =-=  16, 20, 24, 28
@@ -279,6 +279,7 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
     }
 
     vstore4(&c->coeffs[j], r);
-    k += 8;
+    i = (j != 96) ? 0 : 80;
+    k += 8 + i;
   }
 }
