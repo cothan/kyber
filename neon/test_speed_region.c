@@ -31,102 +31,103 @@ int main()
   polyvec matrix[KYBER_K];
   poly ap, bp;
 
+  PAPI_hl_region_begin("gen_matrix");
   for(i=0;i<NTESTS;i++) {
-    PAPI_hl_region_begin("gen_matrix");
     gen_matrix(matrix, seed, 0);
-    PAPI_hl_region_end("gen_matrix");
   }
+  PAPI_hl_region_end("gen_matrix");
 
+  PAPI_hl_region_begin("neon_poly_getnoise_eta1_2x");
   for(i=0;i<NTESTS;i++) {
-    PAPI_hl_region_begin("neon_poly_getnoise_eta1_2x");
     neon_poly_getnoise_eta1_2x(&ap, &bp, seed, 0, 1);
-    PAPI_hl_region_end("neon_poly_getnoise_eta1_2x");
   }
+  PAPI_hl_region_end("neon_poly_getnoise_eta1_2x");
 
+  PAPI_hl_region_begin("neon_poly_getnoise_eta2");
   for(i=0;i<NTESTS;i++) {
-    PAPI_hl_region_begin("neon_poly_getnoise_eta2");
     neon_poly_getnoise_eta2(&ap, seed, 0);
-    PAPI_hl_region_end("neon_poly_getnoise_eta2");
   }
+  PAPI_hl_region_end("neon_poly_getnoise_eta2");
 
+  PAPI_hl_region_begin("poly_tomsg");
   for(i=0;i<NTESTS;i++) {
-    PAPI_hl_region_begin("poly_tomsg");
     poly_tomsg(msg, &ap);
-    PAPI_hl_region_end("poly_tomsg");
   }
+  PAPI_hl_region_end("poly_tomsg");
 
+  PAPI_hl_region_begin("poly_frommsg");
   for(i=0;i<NTESTS;i++) {
-    PAPI_hl_region_begin("poly_frommsg");
     poly_frommsg(&ap, msg);
-    PAPI_hl_region_end("poly_frommsg");
   }
+  PAPI_hl_region_end("poly_frommsg");
 
 
+  PAPI_hl_region_begin("neon_ntt");
   for(i=0;i<NTESTS;i++) {
-    PAPI_hl_region_begin("neon_ntt");
     neon_ntt(ap.coeffs);
-    PAPI_hl_region_end("neon_ntt");
   }
+  PAPI_hl_region_end("neon_ntt");
 
+  PAPI_hl_region_begin("neon_invntt");
   for(i=0;i<NTESTS;i++) {
-    PAPI_hl_region_begin("neon_invntt");
     neon_invntt(ap.coeffs);
-    PAPI_hl_region_end("neon_invntt");
   }
+  PAPI_hl_region_end("neon_invntt");
 
+  PAPI_hl_region_begin("crypto_kem_keypair");
   for(i=0;i<NTESTS;i++) {
-    PAPI_hl_region_begin("crypto_kem_keypair");
     crypto_kem_keypair(pk, sk);
-    PAPI_hl_region_end("crypto_kem_keypair");
   }
+  PAPI_hl_region_end("crypto_kem_keypair");
 
+  PAPI_hl_region_begin("crypto_kem_enc");
   for(i=0;i<NTESTS;i++) {
-    PAPI_hl_region_begin("crypto_kem_enc");
     crypto_kem_enc(ct, key, pk);
-    PAPI_hl_region_end("crypto_kem_enc");
   }
+  PAPI_hl_region_end("crypto_kem_enc");
 
+  PAPI_hl_region_begin("crypto_kem_dec");
   for(i=0;i<NTESTS;i++) {
-    PAPI_hl_region_begin("crypto_kem_dec");
     crypto_kem_dec(key, ct, sk);
-    PAPI_hl_region_end("crypto_kem_dec");
   }
+  PAPI_hl_region_end("crypto_kem_dec");
 
+  /*
+  PAPI_hl_region_begin("kex_uake_initA");
   for(i=0;i<NTESTS;i++) {
-    PAPI_hl_region_begin("kex_uake_initA");
     kex_uake_initA(kexsenda, key, sk, pk);
-    PAPI_hl_region_end("kex_uake_initA");
   }
+  PAPI_hl_region_end("kex_uake_initA");
 
+  PAPI_hl_region_begin("kex_uake_sharedB");
   for(i=0;i<NTESTS;i++) {
-    PAPI_hl_region_begin("kex_uake_sharedB");
     kex_uake_sharedB(kexsendb, kexkey, kexsenda, sk);
-    PAPI_hl_region_end("kex_uake_sharedB");
   }
+  PAPI_hl_region_end("kex_uake_sharedB");
 
+  PAPI_hl_region_begin("kex_uake_sharedA");
   for(i=0;i<NTESTS;i++) {
-    PAPI_hl_region_begin("kex_uake_sharedA");
     kex_uake_sharedA(kexkey, kexsendb, key, sk);
-    PAPI_hl_region_end("kex_uake_sharedA");
   }
+  PAPI_hl_region_end("kex_uake_sharedA");
 
+  PAPI_hl_region_begin("kex_ake_initA");
   for(i=0;i<NTESTS;i++) {
-    PAPI_hl_region_begin("kex_ake_initA");
     kex_ake_initA(kexsenda, key, sk, pk);
-    PAPI_hl_region_end("kex_ake_initA");
   }
+  PAPI_hl_region_end("kex_ake_initA");
 
+  PAPI_hl_region_begin("kex_ake_sharedB");
   for(i=0;i<NTESTS;i++) {
-    PAPI_hl_region_begin("kex_ake_sharedB");
     kex_ake_sharedB(kexsendb, kexkey, kexsenda, sk, pk);
-    PAPI_hl_region_end("kex_ake_sharedB");
   }
+  PAPI_hl_region_end("kex_ake_sharedB");
 
+  PAPI_hl_region_begin("kex_ake_sharedA");
   for(i=0;i<NTESTS;i++) {
-    PAPI_hl_region_begin("kex_ake_sharedA");
     kex_ake_sharedA(kexkey, kexsendb, key, sk, sk);
-    PAPI_hl_region_end("kex_ake_sharedA");
   }
-
+  PAPI_hl_region_end("kex_ake_sharedA");
+  */
   return 0;
 }
