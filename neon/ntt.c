@@ -37,7 +37,7 @@ void init_ntt() {
 
 */
 
-// This array is generate specifically for this ASIMD implementation 
+// This array is generated specifically for this ASIMD implementation 
 const int16_t neon_zetas_inv[280] = {
   1701,1807,1460,2371,2338,2333,308,108,// 1
   2851,870,854,1510,2535,1278,1530,1185,// 1
@@ -99,7 +99,7 @@ const int16_t neon_zetas_inv[280] = {
   1441,1441,1441,1441,1441,1441,1441, // last
 };
 
-// This array is generate specifically for this ASIMD implementation 
+// This array is generated specifically for this ASIMD implementation 
 const int16_t neon_zetas[224] = {
   2970, // 6
   1493, // 5

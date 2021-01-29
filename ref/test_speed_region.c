@@ -39,13 +39,13 @@ int main()
 
   PAPI_hl_region_begin("neon_poly_getnoise_eta1_2x");
   for(i=0;i<NTESTS;i++) {
-    neon_poly_getnoise_eta1_2x(&ap, &bp, seed, 0, 1);
+    poly_getnoise_eta1(&ap, seed, 1);
   }
   PAPI_hl_region_end("neon_poly_getnoise_eta1_2x");
 
   PAPI_hl_region_begin("neon_poly_getnoise_eta2");
   for(i=0;i<NTESTS;i++) {
-    neon_poly_getnoise_eta2(&ap, seed, 0);
+    poly_getnoise_eta2(&ap, seed, 0);
   }
   PAPI_hl_region_end("neon_poly_getnoise_eta2");
 
@@ -64,13 +64,13 @@ int main()
 
   PAPI_hl_region_begin("neon_ntt");
   for(i=0;i<NTESTS;i++) {
-    neon_ntt(ap.coeffs);
+    ntt(ap.coeffs);
   }
   PAPI_hl_region_end("neon_ntt");
 
   PAPI_hl_region_begin("neon_invntt");
   for(i=0;i<NTESTS;i++) {
-    neon_invntt(ap.coeffs);
+    invntt(ap.coeffs);
   }
   PAPI_hl_region_end("neon_invntt");
 
