@@ -540,6 +540,7 @@ unsigned int neon_rej_uniform(int16_t *r, const uint8_t *buf)
     for (i = 0; i < local_index && count < KYBER_N; i++)
     {
         r[count] = local_buf[i];
+        local_buf[i] = 0;
         count++;
     }
 
