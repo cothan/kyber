@@ -451,6 +451,7 @@ void neon_invntt(int16_t r[256])
   z.val[1] = vdupq_n_s16(neon_zetas_inv[273]);
   // print_vector(z, 2, "last");
 
+  // TODO: combine zetas 272 with 273
 
   for (j = 0; j < 128; j += 64)
   {
@@ -471,25 +472,25 @@ void neon_invntt(int16_t r[256])
 
     // v2
     fqmul(v2.val[0], v2.val[0], z.val[0], t);
-    fqmul(v2.val[0], v2.val[0], z.val[1], t);
     fqmul(v2.val[1], v2.val[1], z.val[0], t);
-    fqmul(v2.val[1], v2.val[1], z.val[1], t);
-
     fqmul(v2.val[2], v2.val[2], z.val[0], t);
-    fqmul(v2.val[2], v2.val[2], z.val[1], t);
     fqmul(v2.val[3], v2.val[3], z.val[0], t);
-    fqmul(v2.val[3], v2.val[3], z.val[1], t);
+
+    // fqmul(v2.val[0], v2.val[0], z.val[1], t);
+    // fqmul(v2.val[1], v2.val[1], z.val[1], t);
+    // fqmul(v2.val[2], v2.val[2], z.val[1], t);
+    // fqmul(v2.val[3], v2.val[3], z.val[1], t);
 
     // v3
     fqmul(v3.val[0], v3.val[0], z.val[0], t);
-    fqmul(v3.val[0], v3.val[0], z.val[1], t);
     fqmul(v3.val[1], v3.val[1], z.val[0], t);
-    fqmul(v3.val[1], v3.val[1], z.val[1], t);
-
     fqmul(v3.val[2], v3.val[2], z.val[0], t);
-    fqmul(v3.val[2], v3.val[2], z.val[1], t);
     fqmul(v3.val[3], v3.val[3], z.val[0], t);
-    fqmul(v3.val[3], v3.val[3], z.val[1], t);
+
+    // fqmul(v3.val[0], v3.val[0], z.val[1], t);
+    // fqmul(v3.val[1], v3.val[1], z.val[1], t);
+    // fqmul(v3.val[2], v3.val[2], z.val[1], t);
+    // fqmul(v3.val[3], v3.val[3], z.val[1], t);
 
     // v0
     fqmul(v0.val[0], v0.val[0], z.val[1], t);

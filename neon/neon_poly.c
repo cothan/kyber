@@ -67,14 +67,13 @@ c = reduce(c)
 */
 void neon_poly_add_reduce_csubq(poly *c, const poly *a)
 {
-  int16x8x4_t cc, aa, t;         // 8
-  uint16x8x4_t res;              // 4
+  int16x8x4_t cc, aa, t;         // 12
   int16x8_t neon_v, neon_kyberq; // 2
 
   neon_kyberq = vdupq_n_s16(KYBER_Q);
   neon_v = vdupq_n_s16(((1U << 26) + KYBER_Q / 2) / KYBER_Q);
 
-  // Total register: 26 registers.
+  // Total register: 14 registers.
   unsigned int i;
   for (i = 0; i < KYBER_N; i += 32)
   {
@@ -93,25 +92,6 @@ void neon_poly_add_reduce_csubq(poly *c, const poly *a)
     barrett(cc.val[2], t, 0);
     barrett(cc.val[3], t, 2);
 
-    // c = csubq(c)
-    // res = 0xffff if cc >= kyber_q else 0
-    vcompare(res.val[0], cc.val[0], neon_kyberq);
-    vcompare(res.val[1], cc.val[1], neon_kyberq);
-    vcompare(res.val[2], cc.val[2], neon_kyberq);
-    vcompare(res.val[3], cc.val[3], neon_kyberq);
-
-    // res = res & kyber_q
-    vand(aa.val[0], res.val[0], neon_kyberq);
-    vand(aa.val[1], res.val[1], neon_kyberq);
-    vand(aa.val[2], res.val[2], neon_kyberq);
-    vand(aa.val[3], res.val[3], neon_kyberq);
-
-    // c = c - a;
-    vsub(cc.val[0], cc.val[0], aa.val[0]);
-    vsub(cc.val[1], cc.val[1], aa.val[1]);
-    vsub(cc.val[2], cc.val[2], aa.val[2]);
-    vsub(cc.val[3], cc.val[3], aa.val[3]);
-
     // c = t;
     vstorex4(&c->coeffs[i], cc);
   }
@@ -123,14 +103,13 @@ c = reduce(c)
 */
 void neon_poly_sub_reduce_csubq(poly *c, const poly *a)
 {
-  int16x8x4_t cc, aa, t;         // 8
-  uint16x8x4_t res;              // 4
+  int16x8x4_t cc, aa, t;         // 12
   int16x8_t neon_v, neon_kyberq; // 2
 
   neon_kyberq = vdupq_n_s16(KYBER_Q);
   neon_v = vdupq_n_s16(((1U << 26) + KYBER_Q / 2) / KYBER_Q);
 
-  // Total register: 26 registers.
+  // Total register: 14 registers.
   unsigned int i;
   for (i = 0; i < KYBER_N; i += 32)
   {
@@ -149,25 +128,6 @@ void neon_poly_sub_reduce_csubq(poly *c, const poly *a)
     barrett(cc.val[2], t, 0);
     barrett(cc.val[3], t, 2);
 
-    // c = csubq(c)
-    // res = 0xffff if cc >= kyber_q else 0
-    vcompare(res.val[0], cc.val[0], neon_kyberq);
-    vcompare(res.val[1], cc.val[1], neon_kyberq);
-    vcompare(res.val[2], cc.val[2], neon_kyberq);
-    vcompare(res.val[3], cc.val[3], neon_kyberq);
-
-    // res = res & kyber_q
-    vand(aa.val[0], res.val[0], neon_kyberq);
-    vand(aa.val[1], res.val[1], neon_kyberq);
-    vand(aa.val[2], res.val[2], neon_kyberq);
-    vand(aa.val[3], res.val[3], neon_kyberq);
-
-    // c = c - a;
-    vsub(cc.val[0], cc.val[0], aa.val[0]);
-    vsub(cc.val[1], cc.val[1], aa.val[1]);
-    vsub(cc.val[2], cc.val[2], aa.val[2]);
-    vsub(cc.val[3], cc.val[3], aa.val[3]);
-
     // c = t;
     vstorex4(&c->coeffs[i], cc);
   }
@@ -180,13 +140,12 @@ c = reduce(c)
 void neon_poly_add_add_reduce_csubq(poly *c, const poly *a, const poly *b)
 {
   int16x8x4_t cc, aa, bb, t;        // 16
-  uint16x8x4_t res;              // 4
-  int16x8_t neon_v, neon_kyberq; // 3
+  int16x8_t neon_v, neon_kyberq; // 2
 
   neon_kyberq = vdupq_n_s16(KYBER_Q);
   neon_v = vdupq_n_s16(((1U << 26) + KYBER_Q / 2) / KYBER_Q);
 
-  // Total register: 30 registers.
+  // Total register: 18 registers.
   unsigned int i;
   for (i = 0; i < KYBER_N; i += 32)
   {
@@ -211,25 +170,6 @@ void neon_poly_add_add_reduce_csubq(poly *c, const poly *a, const poly *b)
     barrett(cc.val[1], t, 2);
     barrett(cc.val[2], t, 0);
     barrett(cc.val[3], t, 2);
-
-    // c = csubq(c)
-    // res = 0xffff if cc >= kyber_q else 0
-    vcompare(res.val[0], cc.val[0], neon_kyberq);
-    vcompare(res.val[1], cc.val[1], neon_kyberq);
-    vcompare(res.val[2], cc.val[2], neon_kyberq);
-    vcompare(res.val[3], cc.val[3], neon_kyberq);
-
-    // res = res & kyber_q
-    vand(aa.val[0], res.val[0], neon_kyberq);
-    vand(aa.val[1], res.val[1], neon_kyberq);
-    vand(aa.val[2], res.val[2], neon_kyberq);
-    vand(aa.val[3], res.val[3], neon_kyberq);
-
-    // c = c - a;
-    vsub(cc.val[0], cc.val[0], aa.val[0]);
-    vsub(cc.val[1], cc.val[1], aa.val[1]);
-    vsub(cc.val[2], cc.val[2], aa.val[2]);
-    vsub(cc.val[3], cc.val[3], aa.val[3]);
 
     // c = t;
     vstorex4(&c->coeffs[i], cc);
