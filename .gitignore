@@ -14,9 +14,6 @@ neon/neon_sample
 neon/.gdb_history
 neon/gen_sample.py
 neon/test_func/neon_sample
-ref/test_speedusec512
-ref/test_speedusec768
-ref/test_speedusec1024
 neon/test_speedusec1024
 neon/test_speedusec768
 neon/test_speedusec512
@@ -27,6 +24,11 @@ neon/test_speed768keccak
 neon/test_speed1024keccak
 neon/autobuild
 neon/test.c
+ref/test_speedusec512
+ref/test_speedusec768
+ref/test_speedusec1024
+ref/params.h
 ref/test_speed512keccak
 ref/test_speed768keccak
 ref/test_speed1024keccak
+ref/PQCgenKAT_kem
