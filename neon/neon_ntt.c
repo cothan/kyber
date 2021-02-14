@@ -100,7 +100,8 @@ neon_v, neon_kyber16
   t.val[i] = (int16x8_t)vmull_s16(vget_low_s16(inout), vget_low_s16(neon_v)); \
   t.val[i + 1] = (int16x8_t)vmull_high_s16(inout, neon_v);                    \
   t.val[i] = vuzp2q_s16(t.val[i], t.val[i + 1]);                              \
-  t.val[i + 1] = vshrq_n_s16(t.val[i], 10);                                   \
+  t.val[i + 1] = vaddq_s16(t.val[i], neon_one);                               \
+  t.val[i + 1] = vshrq_n_s16(t.val[i + 1], 10);                               \
   inout = vmlsq_s16(inout, t.val[i + 1], neon_kyberq);
 
 /*
@@ -110,20 +111,22 @@ t32_1, t32_2: int32x4_t
 t16: int16x8_t
 */
 #define barret_hi(v1, v2, t, i)                                                   \
-  t.val[i + 0] = (int16x8_t)vmull_high_s16(v1, neon_v);                           \
+  t.val[i] = (int16x8_t)vmull_high_s16(v1, neon_v);                               \
   t.val[i + 1] = (int16x8_t)vmull_high_s16(v2, neon_v);                           \
-  t.val[i + 0] = vuzp2q_s16(t.val[i], t.val[i + 1]);                              \
-  t.val[i + 0] = vshrq_n_s16(t.val[i], 10);                                       \
+  t.val[i] = vuzp2q_s16(t.val[i], t.val[i + 1]);                                  \
+  t.val[i] = vaddq_s16(t.val[i], neon_one);                                       \
+  t.val[i] = vshrq_n_s16(t.val[i], 10);                                           \
   t.val[i + 1] = (int16x8_t)vzip2q_s64((int64x2_t)v1, (int64x2_t)v2);             \
   t.val[i + 1] = vmlsq_s16(t.val[i + 1], t.val[i], neon_kyberq);                  \
   v1 = (int16x8_t)vcopyq_laneq_s64((int64x2_t)v1, 1, (int64x2_t)t.val[i + 1], 0); \
   v2 = (int16x8_t)vcopyq_laneq_s64((int64x2_t)v2, 1, (int64x2_t)t.val[i + 1], 1);
 
 #define barret_lo(v1, v2, t, i)                                                   \
-  t.val[i + 0] = (int16x8_t)vmull_s16(vget_low_s16(v1), vget_low_s16(neon_v));    \
+  t.val[i] = (int16x8_t)vmull_s16(vget_low_s16(v1), vget_low_s16(neon_v));        \
   t.val[i + 1] = (int16x8_t)vmull_s16(vget_low_s16(v2), vget_low_s16(neon_v));    \
-  t.val[i + 0] = vuzp2q_s16(t.val[i], t.val[i + 1]);                              \
-  t.val[i + 0] = vshrq_n_s16(t.val[i], 10);                                       \
+  t.val[i] = vuzp2q_s16(t.val[i], t.val[i + 1]);                                  \
+  t.val[i] = vaddq_s16(t.val[i], neon_one);                                       \
+  t.val[i] = vshrq_n_s16(t.val[i], 10);                                           \
   t.val[i + 1] = (int16x8_t)vzip1q_s64((int64x2_t)v1, (int64x2_t)v2);             \
   t.val[i + 1] = vmlsq_s16(t.val[i + 1], t.val[i], neon_kyberq);                  \
   v1 = (int16x8_t)vcopyq_laneq_s64((int64x2_t)v1, 0, (int64x2_t)t.val[i + 1], 0); \
@@ -240,20 +243,23 @@ v: int16x8x4_t
 void neon_invntt(int16_t r[256])
 {
   int j, k = 0;
-  // Register: Total 24 + 3(const) = 27
+  // Register: Total 24 + 4(const) = 28
   int16x8x4_t t, v0, v1, v2, v3, z; // 24
   // End
-  int16x8_t neon_v, neon_qinv, neon_kyberq;
+  int16x8_t neon_v, neon_qinv, neon_kyberq, neon_one;
   neon_qinv = vdupq_n_s16(QINV);
   neon_kyberq = vdupq_n_s16(KYBER_Q);
   neon_v = vdupq_n_s16(_V);
+  neon_one = vdupq_n_s16(1 << 9);
+
+  const int16_t f = 1441; // mont^2/128
 
   // *Vectorize* barret_reduction over 96 points rather than 896 points
   // Optimimal Barret reduction for Kyber N=256, B=9 is 78 points, see here:
   // https://eprint.iacr.org/2020/1377.pdf
 
   // Layer 1, 2, 3, 4, 5, 6
-  // Total register: 26
+  // Total register: 27
   for (j = 0; j < 256; j += 128)
   {
     // 1st layer : v0.val[0] x v0.val[2] | v0.val[1] x v0.val[3]
@@ -447,11 +453,9 @@ void neon_invntt(int16_t r[256])
   // Layer 7, inv_mul
   // vload(z.val[0], &neon_zetas_inv[368]);
   // vload(z.val[1], &neon_zetas_inv[376]);
-  z.val[0] = vdupq_n_s16(neon_zetas_inv[272]);
-  z.val[1] = vdupq_n_s16(neon_zetas_inv[273]);
+  z.val[0] = vdupq_n_s16(neon_zetas_inv[271]);
+  z.val[1] = vdupq_n_s16(f);
   // print_vector(z, 2, "last");
-
-  // TODO: combine zetas 272 with 273
 
   for (j = 0; j < 128; j += 64)
   {
