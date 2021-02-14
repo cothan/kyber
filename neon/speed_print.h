@@ -6,6 +6,4 @@
 
 void print_results(const char *s, uint64_t *t, size_t tlen);
 
-void print_results_usec(const char *s, uint64_t *t, size_t tlen);
-
 #endif

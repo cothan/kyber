@@ -13,19 +13,22 @@
 *
 * Arguments:   - uint8_t *r: pointer to output byte array
 *                            (of length KYBER_POLYCOMPRESSEDBYTES)
-*              - poly *a:    pointer to input polynomial
+*              - const poly *a: pointer to input polynomial
 **************************************************/
-void poly_compress(uint8_t r[KYBER_POLYCOMPRESSEDBYTES], poly *a)
+void poly_compress(uint8_t r[KYBER_POLYCOMPRESSEDBYTES], const poly *a)
 {
   unsigned int i,j;
+  int16_t u;
   uint8_t t[8];
-
-  // poly_csubq(a);
 
 #if (KYBER_POLYCOMPRESSEDBYTES == 128)
   for(i=0;i<KYBER_N/8;i++) {
-    for(j=0;j<8;j++)
-      t[j] = ((((uint16_t)a->coeffs[8*i+j] << 4) + KYBER_Q/2)/KYBER_Q) & 15;
+    for(j=0;j<8;j++) {
+      // map to positive standard representatives
+      u  = a->coeffs[8*i+j];
+      u += (u >> 15) & KYBER_Q;
+      t[j] = ((((uint16_t)u << 4) + KYBER_Q/2)/KYBER_Q) & 15;
+    }
 
     r[0] = t[0] | (t[1] << 4);
     r[1] = t[2] | (t[3] << 4);
@@ -35,8 +38,12 @@ void poly_compress(uint8_t r[KYBER_POLYCOMPRESSEDBYTES], poly *a)
   }
 #elif (KYBER_POLYCOMPRESSEDBYTES == 160)
   for(i=0;i<KYBER_N/8;i++) {
-    for(j=0;j<8;j++)
-      t[j] = ((((uint32_t)a->coeffs[8*i+j] << 5) + KYBER_Q/2)/KYBER_Q) & 31;
+    for(j=0;j<8;j++) {
+      // map to positive standard representatives
+      u  = a->coeffs[8*i+j];
+      u += (u >> 15) & KYBER_Q;
+      t[j] = ((((uint32_t)u << 5) + KYBER_Q/2)/KYBER_Q) & 31;
+    }
 
     r[0] = (t[0] >> 0) | (t[1] << 5);
     r[1] = (t[1] >> 3) | (t[2] << 2) | (t[3] << 7);
@@ -56,7 +63,7 @@ void poly_compress(uint8_t r[KYBER_POLYCOMPRESSEDBYTES], poly *a)
 * Description: De-serialization and subsequent decompression of a polynomial;
 *              approximate inverse of poly_compress
 *
-* Arguments:   - poly *r:          pointer to output polynomial
+* Arguments:   - poly *r: pointer to output polynomial
 *              - const uint8_t *a: pointer to input byte array
 *                                  (of length KYBER_POLYCOMPRESSEDBYTES bytes)
 **************************************************/
@@ -99,22 +106,41 @@ void poly_decompress(poly *r, const uint8_t a[KYBER_POLYCOMPRESSEDBYTES])
 *
 * Arguments:   - uint8_t *r: pointer to output byte array
 *                            (needs space for KYBER_POLYBYTES bytes)
-*              - poly *a:    pointer to input polynomial
+*              - const poly *a: pointer to input polynomial
 **************************************************/
-void poly_tobytes(uint8_t r[KYBER_POLYBYTES], poly *a, const uint8_t reduce)
+void poly_tobytes(uint8_t r[KYBER_POLYBYTES], const poly *a)
 {
   unsigned int i;
   uint16_t t0, t1;
 
-  if (reduce)
-    poly_csubq(a);
-
   for(i=0;i<KYBER_N/2;i++) {
-    t0 = a->coeffs[2*i];
+    // map to positive standard representatives
+    t0  = a->coeffs[2*i];
+    t0 += ((int16_t)t0 >> 15) & KYBER_Q;
     t1 = a->coeffs[2*i+1];
+    t1 += ((int16_t)t1 >> 15) & KYBER_Q;
     r[3*i+0] = (t0 >> 0);
     r[3*i+1] = (t0 >> 8) | (t1 << 4);
     r[3*i+2] = (t1 >> 4);
+  }
+}
+
+/*************************************************
+* Name:        poly_frombytes
+*
+* Description: De-serialization of a polynomial;
+*              inverse of poly_tobytes
+*
+* Arguments:   - poly *r: pointer to output polynomial
+*              - const uint8_t *a: pointer to input byte array
+*                                  (of KYBER_POLYBYTES bytes)
+**************************************************/
+void poly_frombytes(poly *r, const uint8_t a[KYBER_POLYBYTES])
+{
+  unsigned int i;
+  for(i=0;i<KYBER_N/2;i++) {
+    r->coeffs[2*i]   = ((a[3*i+0] >> 0) | ((uint16_t)a[3*i+1] << 8)) & 0xFFF;
+    r->coeffs[2*i+1] = ((a[3*i+1] >> 4) | ((uint16_t)a[3*i+2] << 4)) & 0xFFF;
   }
 }
 
@@ -123,7 +149,7 @@ void poly_tobytes(uint8_t r[KYBER_POLYBYTES], poly *a, const uint8_t reduce)
 *
 * Description: Convert 32-byte message to polynomial
 *
-* Arguments:   - poly *r:            pointer to output polynomial
+* Arguments:   - poly *r: pointer to output polynomial
 *              - const uint8_t *msg: pointer to input message
 **************************************************/
 void poly_frommsg(poly *r, const uint8_t msg[KYBER_INDCPA_MSGBYTES])
@@ -149,19 +175,19 @@ void poly_frommsg(poly *r, const uint8_t msg[KYBER_INDCPA_MSGBYTES])
 * Description: Convert polynomial to 32-byte message
 *
 * Arguments:   - uint8_t *msg: pointer to output message
-*              - poly *a:      pointer to input polynomial
+*              - const poly *a: pointer to input polynomial
 **************************************************/
-void poly_tomsg(uint8_t msg[KYBER_INDCPA_MSGBYTES], poly *a)
+void poly_tomsg(uint8_t msg[KYBER_INDCPA_MSGBYTES], const poly *a)
 {
   unsigned int i,j;
   uint16_t t;
 
-  // poly_csubq(a);
-
   for(i=0;i<KYBER_N/8;i++) {
     msg[i] = 0;
     for(j=0;j<8;j++) {
-      t = ((((uint16_t)a->coeffs[8*i+j] << 1) + KYBER_Q/2)/KYBER_Q) & 1;
+      t  = a->coeffs[8*i+j];
+      t += ((int16_t)t >> 15) & KYBER_Q;
+      t  = (((t << 1) + KYBER_Q/2)/KYBER_Q) & 1;
       msg[i] |= t << j;
     }
   }
