@@ -30,3 +30,16 @@ jobs:
       script: ./runlcov.sh
       after_success:
         - coveralls-lcov ref/kyber.lcov
+
+  allow_failures:
+    - os: windows
+      compiler: msvc19
+      before_install:
+        - choco install openssl
+      script:
+        - mkdir build
+        - cd build
+        - cmake -A x64 ..
+        - cmake --build .
+        - ctest --output-on-failure
+
