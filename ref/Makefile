@@ -6,15 +6,14 @@ LIBPAPI = lib/libpapi.a
 NISTFLAGS += -Wno-unused-result -O3
 RM = /bin/rm
 
-SOURCES = kem.c indcpa.c polyvec.c poly.c reduce.c ntt.c cbd.c verify.c
+SOURCES = kex.c kem.c indcpa.c polyvec.c poly.c ntt.c cbd.c reduce.c verify.c
 SOURCESKECCAK = $(SOURCES) fips202.c symmetric-shake.c
 SOURCESNINETIES = $(SOURCES) sha256.c sha512.c aes256ctr.c symmetric-aes.c
-HEADERS = params.h api.h indcpa.h polyvec.h poly.h reduce.h ntt.h cbd.h \
-  verify.h symmetric.h randombytes.h
+HEADERS = params.h kex.h kem.h indcpa.h polyvec.h poly.h ntt.h cbd.h reduce.c verify.h symmetric.h
 HEADERSKECCAK = $(HEADERS) fips202.h
 HEADERSNINETIES = $(HEADERS) aes256ctr.h sha2.h
 
-.PHONY: all shared clean
+.PHONY: all speed shared clean
 
 all: \
   test_kyber512 \
@@ -43,11 +42,15 @@ all: \
   test_kex1024-90s \
   test_vectors512-90s \
   test_vectors768-90s \
-  test_vectors1024-90s \
+  test_vectors1024-90s
+
+speed: \
+  test_speed512 \
+  test_speed768 \
+  test_speed1024 \
   test_speed512-90s \
   test_speed768-90s \
-  test_speed1024-90s \
-  PQCgenKAT_kem
+  test_speed1024-90s
 
 speed: \
   test_speedusec512 \
@@ -72,10 +75,14 @@ shared: \
   libpqcrystals_kyber768-90s_ref.so \
   libpqcrystals_kyber1024-90s_ref.so \
   libpqcrystals_fips202_ref.so \
+  libpqcrystals_aes256ctr_ref.so \
   libpqcrystals_sha2_ref.so
 
 libpqcrystals_fips202_ref.so: fips202.c fips202.h
 	$(CC) -shared -fPIC $(CFLAGS) fips202.c -o libpqcrystals_fips202_ref.so
+
+libpqcrystals_aes256ctr_ref.so: aes256ctr.c aes256ctr.h
+	$(CC) -shared -fPIC $(CFLAGS) aes256ctr.c -o libpqcrystals_aes256ctr_ref.so
 
 libpqcrystals_sha2_ref.so: sha256.c sha512.c sha2.h
 	$(CC) -shared -fPIC $(CFLAGS) sha256.c sha512.c -o libpqcrystals_sha2_ref.so
@@ -98,14 +105,14 @@ test_kyber768: $(SOURCESKECCAK) $(HEADERSKECCAK) test_kyber.c randombytes.c
 test_kyber1024: $(SOURCESKECCAK) $(HEADERSKECCAK) test_kyber.c randombytes.c
 	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c test_kyber.c -o test_kyber1024
 
-test_kex512: $(SOURCESKECCAK) $(HEADERSKECCAK) test_kex.c randombytes.c kex.c kex.h
-	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c kex.c test_kex.c -o test_kex512
+test_kex512: $(SOURCESKECCAK) $(HEADERSKECCAK) test_kex.c randombytes.c
+	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c test_kex.c -o test_kex512
 
-test_kex768: $(SOURCESKECCAK) $(HEADERSKECCAK) test_kex.c randombytes.c kex.c kex.h
-	$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) randombytes.c kex.c test_kex.c -o test_kex768
+test_kex768: $(SOURCESKECCAK) $(HEADERSKECCAK) test_kex.c randombytes.c
+	$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) randombytes.c test_kex.c -o test_kex768
 
-test_kex1024: $(SOURCESKECCAK) $(HEADERSKECCAK) test_kex.c randombytes.c kex.c kex.h
-	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c kex.c test_kex.c -o test_kex1024
+test_kex1024: $(SOURCESKECCAK) $(HEADERSKECCAK) test_kex.c randombytes.c
+	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c test_kex.c -o test_kex1024
 
 test_vectors512: $(SOURCESKECCAK) $(HEADERSKECCAK) test_vectors.c
 	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) test_vectors.c -o test_vectors512
@@ -161,14 +168,14 @@ test_kyber768-90s: $(SOURCESNINETIES) $(HEADERSNINETIES) test_kyber.c randombyte
 test_kyber1024-90s: $(SOURCESNINETIES) $(HEADERSNINETIES) test_kyber.c randombytes.c
 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=4 $(SOURCESNINETIES) randombytes.c test_kyber.c -o test_kyber1024-90s
 
-test_kex512-90s: $(SOURCESNINETIES) $(HEADERSNINETIES) test_kex.c randombytes.c fips202.c fips202.h kex.c kex.h
-	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=2 $(SOURCESNINETIES) randombytes.c fips202.c kex.c test_kex.c -o test_kex512-90s
+test_kex512-90s: $(SOURCESNINETIES) $(HEADERSNINETIES) test_kex.c randombytes.c
+	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=2 $(SOURCESNINETIES) randombytes.c test_kex.c -o test_kex512-90s
 
-test_kex768-90s: $(SOURCESNINETIES) $(HEADERSNINETIES) test_kex.c randombytes.c fips202.c fips202.h kex.c kex.h
-	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=3 $(SOURCESNINETIES) randombytes.c fips202.c kex.c test_kex.c -o test_kex768-90s
+test_kex768-90s: $(SOURCESNINETIES) $(HEADERSNINETIES) test_kex.c randombytes.c
+	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=3 $(SOURCESNINETIES) randombytes.c test_kex.c -o test_kex768-90s
 
-test_kex1024-90s: $(SOURCESNINETIES) $(HEADERSNINETIES) test_kex.c randombytes.c fips202.c fips202.h kex.c kex.h
-	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=4 $(SOURCESNINETIES) randombytes.c fips202.c kex.c test_kex.c -o test_kex1024-90s
+test_kex1024-90s: $(SOURCESNINETIES) $(HEADERSNINETIES) test_kex.c randombytes.c
+	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=4 $(SOURCESNINETIES) randombytes.c test_kex.c -o test_kex1024-90s
 
 test_vectors512-90s: $(SOURCESNINETIES) $(HEADERSNINETIES) test_vectors.c
 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=2 $(SOURCESNINETIES) test_vectors.c -o test_vectors512-90s
@@ -188,8 +195,8 @@ test_speed768-90s: $(SOURCESNINETIES) $(HEADERSNINETIES) cpucycles.h cpucycles.c
 test_speed1024-90s: $(SOURCESNINETIES) $(HEADERSNINETIES) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed_region.c randombytes.c kex.c kex.h fips202.c fips202.h
 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=4 $(SOURCESNINETIES) randombytes.c cpucycles.c kex.c fips202.c speed_print.c test_speed_region.c -o test_speed1024-90s
 
-PQCgenKAT_kem: $(SOURCESKECCAK) $(HEADERSKECCAK) PQCgenKAT_kem.c rng.c rng.h
-	$(CC) $(NISTFLAGS) -o $@ $(SOURCESKECCAK) -I. rng.c PQCgenKAT_kem.c $(LDFLAGS) -lcrypto
+PQCgenKAT_kem1024-90s: $(SOURCESNINETIES) $(HEADERSNINETIES) PQCgenKAT_kem.c rng.c rng.h
+	$(CC) $(NISTFLAGS) -DKYBER_K=4 -DKYBER_90S -o $@ $(SOURCESNINETIES) rng.c PQCgenKAT_kem.c $(LDFLAGS) -lcrypto
 
 clean:
 	-$(RM) -rf *.gcno *.gcda *.lcov *.o *.so

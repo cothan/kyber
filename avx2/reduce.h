@@ -2,13 +2,11 @@
 #define REDUCE_H
 
 #include "params.h"
-#include <stdint.h>
+#include <immintrin.h>
 
-#define reduce_avx KYBER_NAMESPACE(_reduce_avx)
-int16_t reduce_avx(int16_t *r, const int16_t *qdata);
-#define csubq_avx KYBER_NAMESPACE(_csubq_avx)
-int16_t csubq_avx(int16_t *r, const int16_t *qdata);
-#define tomont_avx KYBER_NAMESPACE(_tomont_avx)
-int16_t tomont_avx(int16_t *r, const int16_t *qdata);
+#define reduce_avx KYBER_NAMESPACE(reduce_avx)
+void reduce_avx(__m256i *r, const __m256i *qdata);
+#define tomont_avx KYBER_NAMESPACE(tomont_avx)
+void tomont_avx(__m256i *r, const __m256i *qdata);
 
 #endif
