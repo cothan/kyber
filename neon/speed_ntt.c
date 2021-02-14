@@ -1,6 +1,9 @@
 #include <papi.h>
 #include <stdio.h>
 #include <arm_neon.h>
+#include <sys/random.h>
+#include <string.h>
+#include <assert.h>
 #include "polyvec.h"
 #include "params.h"
 #include "ntt.h"
@@ -9,37 +12,113 @@
 // clang ntt.c reduce.c neon_ntt.c speed_ntt.c -o neon_ntt -O3 -g3 -Wall -Werror -Wextra -Wpedantic -lpapi
 // gcc   ntt.c reduce.c neon_ntt.c speed_ntt.c -o neon_ntt -O3 -g3 -Wall -Werror -Wextra -Wpedantic -lpapi
 
-static const int16_t ref_zetas[128] = {
-    2285, 2571, 2970, 1812, 1493, 1422, 287, 202,
-    3158, 622, 1577, 182, 962, 2127, 1855, 1468,
-    573, 2004, 264, 383, 2500, 1458, 1727, 3199,
-    2648, 1017, 732, 608, 1787, 411, 3124, 1758,
-    1223, 652, 2777, 1015, 2036, 1491, 3047, 1785,
-    516, 3321, 3009, 2663, 1711, 2167, 126, 1469,
-    2476, 3239, 3058, 830, 107, 1908, 3082, 2378,
-    2931, 961, 1821, 2604, 448, 2264, 677, 2054,
-    2226, 430, 555, 843, 2078, 871, 1550, 105,
-    422, 587, 177, 3094, 3038, 2869, 1574, 1653,
-    3083, 778, 1159, 3182, 2552, 1483, 2727, 1119,
-    1739, 644, 2457, 349, 418, 329, 3173, 3254,
-    817, 1097, 603, 610, 1322, 2044, 1864, 384,
-    2114, 3193, 1218, 1994, 2455, 220, 2142, 1670,
-    2144, 1799, 2051, 794, 1819, 2475, 2459, 478,
-    3221, 3021, 996, 991, 958, 1869, 1522, 1628};
+const int16_t zetas[128] = {
+    -1044, -758, -359, -1517, 1493, 1422, 287, 202,
+    -171, 622, 1577, 182, 962, -1202, -1474, 1468,
+    573, -1325, 264, 383, -829, 1458, -1602, -130,
+    -681, 1017, 732, 608, -1542, 411, -205, -1571,
+    1223, 652, -552, 1015, -1293, 1491, -282, -1544,
+    516, -8, -320, -666, -1618, -1162, 126, 1469,
+    -853, -90, -271, 830, 107, -1421, -247, -951,
+    -398, 961, -1508, -725, 448, -1065, 677, -1275,
+    -1103, 430, 555, 843, -1251, 871, 1550, 105,
+    422, 587, 177, -235, -291, -460, 1574, 1653,
+    -246, 778, 1159, -147, -777, 1483, -602, 1119,
+    -1590, 644, -872, 349, 418, 329, -156, -75,
+    817, 1097, 603, 610, 1322, -1285, -1465, 384,
+    -1215, -136, 1218, -1335, -874, 220, -1187, -1659,
+    -1185, -1530, -1278, 794, -1510, -854, -870, 478,
+    -108, -308, 996, 991, 958, -1460, 1522, 1628};
 
-static const int16_t ref_zetas_inv[128] = {
-    1701, 1807, 1460, 2371, 2338, 2333, 308, 108, 2851, 870, 854, 1510, 2535,
-    1278, 1530, 1185, 1659, 1187, 3109, 874, 1335, 2111, 136, 1215, 2945, 1465,
-    1285, 2007, 2719, 2726, 2232, 2512, 75, 156, 3000, 2911, 2980, 872, 2685,
-    1590, 2210, 602, 1846, 777, 147, 2170, 2551, 246, 1676, 1755, 460, 291, 235,
-    3152, 2742, 2907, 3224, 1779, 2458, 1251, 2486, 2774, 2899, 1103, 1275, 2652,
-    1065, 2881, 725, 1508, 2368, 398, 951, 247, 1421, 3222, 2499, 271, 90, 853,
-    1860, 3203, 1162, 1618, 666, 320, 8, 2813, 1544, 282, 1838, 1293, 2314, 552,
-    2677, 2106, 1571, 205, 2918, 1542, 2721, 2597, 2312, 681, 130, 1602, 1871,
-    829, 2946, 3065, 1325, 2756, 1861, 1474, 1202, 2367, 3147, 1752, 2707, 171,
-    3127, 3042, 1907, 1836, 1517, 359, 758, 1441};
+/*************************************************
+* Name:        fqmul
+*
+* Description: Multiplication followed by Montgomery reduction
+*
+* Arguments:   - int16_t a: first factor
+*              - int16_t b: second factor
+*
+* Returns 16-bit integer congruent to a*b*R^{-1} mod q
+**************************************************/
+static int16_t fqmul(int16_t a, int16_t b) {
+  return montgomery_reduce((int32_t)a*b);
+}
 
-static int compare(int16_t *a, int16_t *b, int length, const char *string)
+/*************************************************
+* Name:        ntt
+*
+* Description: Inplace number-theoretic transform (NTT) in Rq.
+*              input is in standard order, output is in bitreversed order
+*
+* Arguments:   - int16_t r[256]: pointer to input/output vector of elements of Zq
+**************************************************/
+void ntt(int16_t r[256]) {
+  unsigned int len, start, j, k;
+  int16_t t, zeta;
+
+  k = 1;
+  for(len = 128; len >= 2; len >>= 1) {
+    for(start = 0; start < 256; start = j + len) {
+      zeta = zetas[k++];
+      for(j = start; j < start + len; j++) {
+        t = fqmul(zeta, r[j + len]);
+        r[j + len] = r[j] - t;
+        r[j] = r[j] + t;
+      }
+    }
+  }
+}
+
+/*************************************************
+* Name:        invntt_tomont
+*
+* Description: Inplace inverse number-theoretic transform in Rq and
+*              multiplication by Montgomery factor 2^16.
+*              Input is in bitreversed order, output is in standard order
+*
+* Arguments:   - int16_t r[256]: pointer to input/output vector of elements of Zq
+**************************************************/
+void invntt(int16_t r[256]) {
+  unsigned int start, len, j, k;
+  int16_t t, zeta;
+  const int16_t f = 1441; // mont^2/128
+  // int32_t overflow;
+
+  k = 127;
+  for(len = 2; len <= 128; len <<= 1) {
+    for(start = 0; start < 256; start = j + len) {
+      zeta = zetas[k--];
+      for(j = start; j < start + len; j++) {
+        t = r[j];
+        /* overflow = (int32_t) t + r[j + len];
+        if (overflow > INT16_MAX) 
+        {
+          printf("%d: [%d] overflow: %d\n", len, j ,overflow);
+        }
+        else if (overflow < INT16_MIN)
+        {
+          printf("%d: [%d] overflow: %d\n", len, j, overflow);
+        }
+        
+        if (len > 4) {
+        }
+        else{
+          r[j] = (t + r[j + len]);
+        } */
+        r[j] = barrett_reduce(t + r[j + len]);
+        r[j + len] = r[j + len] - t;
+        r[j + len] = fqmul(zeta, r[j + len]);
+      }
+    }
+  }
+
+  for(j = 0; j < 256; j++)
+    r[j] = fqmul(r[j], f);
+}
+
+
+/* static 
+int compare_strict(int16_t *a, int16_t *b, int length, const char *string)
 {
   int i, j, count = 0;
   int16_t aa, bb;
@@ -47,8 +126,41 @@ static int compare(int16_t *a, int16_t *b, int length, const char *string)
   {
     for (j = i; j < i + 8; j++)
     {
-      aa = a[j]; // % KYBER_Q;
-      bb = b[j]; // % KYBER_Q;
+      aa = a[j];
+      bb = b[j];
+      if (aa != bb)
+      {
+        printf("%d: %d != %d\n", j, aa, bb);
+        count += 1;
+      }
+
+      if (count > 8)
+      {
+        printf("%s Incorrect!!\n", string);
+        return 1;
+      }
+    }
+  }
+  if (count)
+  {
+    printf("%s Incorrect!!\n", string);
+    return 1;
+  }
+  printf("OK: %s\n", string);
+  return 0;
+} */
+
+static 
+int compare(int16_t *a, int16_t *b, int length, const char *string)
+{
+  int i, j, count = 0;
+  int16_t aa, bb;
+  for (i = 0; i < length; i += 8)
+  {
+    for (j = i; j < i + 8; j++)
+    {
+      aa = a[j]; //% KYBER_Q;
+      bb = b[j]; //% KYBER_Q;
       if (aa != bb)
       {
         if ((aa + KYBER_Q == bb) || (aa - KYBER_Q == bb))
@@ -78,97 +190,61 @@ static int compare(int16_t *a, int16_t *b, int length, const char *string)
   return 0;
 }
 
-static int16_t fqmul1(int16_t a, int16_t b)
-{
-  return montgomery_reduce((int32_t)a * b);
-}
-
-static void ntt(int16_t r[256])
-{
-  unsigned int len, start, j, k;
-  int16_t t, zeta;
-
-  k = 1;
-  for (len = 128; len >= 2; len >>= 1)
-  {
-    for (start = 0; start < 256; start = j + len)
-    {
-      zeta = ref_zetas[k++];
-      for (j = start; j < start + len; ++j)
-      {
-        t = fqmul1(zeta, r[j + len]);
-        r[j + len] = r[j] - t;
-        r[j] = r[j] + t;
-      }
-    }
-  }
-}
-
-static void invntt(int16_t r[256])
-{
-  unsigned int start, len, j, k;
-  int16_t t, zeta;
-
-  k = 0;
-  for (len = 2; len <= 128; len <<= 1)
-  {
-    for (start = 0; start < 256; start = j + len)
-    {
-      zeta = ref_zetas_inv[k++];
-      for (j = start; j < start + len; ++j)
-      {
-        t = r[j];
-        r[j] = barrett_reduce(t + r[j + len]);
-        r[j + len] = t - r[j + len];
-        r[j + len] = fqmul1(zeta, r[j + len]);
-      }
-    }
-  }
-
-  for (j = 0; j < 256; ++j)
-    r[j] = fqmul1(r[j], ref_zetas_inv[127]);
-}
-
-static
+static 
 void poly_reduce(poly *r)
 {
   unsigned int i;
-  for(i=0;i<KYBER_N;i++)
+  for (i = 0; i < KYBER_N; i++)
     r->coeffs[i] = barrett_reduce(r->coeffs[i]);
 }
 
-
-static
+static 
 void poly_ntt(poly *r)
 {
   ntt(r->coeffs);
   poly_reduce(r);
 }
 
-static
+static 
 void poly_neon_ntt(poly *r)
 {
   neon_ntt(r->coeffs);
-  // poly_reduce(r);
+  poly_reduce(r);
 }
 
+void print_array(const int16_t *buf, int buflen, const char *string)
+{
+    printf("%s: [", string);
+    for (int i = 0; i < buflen; i++)
+    {
+        printf("%d, ", buf[i]);
+    }
+    printf("]\n");
+}
 
+void reduce(int16_t r[256])
+{
+  for (int i = 0; i < 256; i++)
+  {
+    r[i] = barrett_reduce(r[i]);
+  }
+}
 
-#include <sys/random.h>
-#include <string.h>
-
-#define TEST1 0
-#define TEST2 10000
+#define TEST1 1000000
+#define TEST2 0
 
 int main(void)
 {
   int16_t r_gold[256], r1[256], r2[256];
   int retval;
+  int comp = 0;
 
   getrandom(r_gold, sizeof(r_gold), 0);
   for (int i = 0; i < 256; i++)
   {
-    r_gold[i] %= KYBER_Q;
+    r_gold[i] = barrett_reduce(r_gold[i]);
+    assert(r_gold[i] < INT16_MAX);
+    assert(INT16_MIN < r_gold[i]);
   }
   memcpy(r1, r_gold, sizeof(r_gold));
   memcpy(r2, r_gold, sizeof(r_gold));
@@ -181,12 +257,19 @@ int main(void)
   }
   retval = PAPI_hl_region_end("c_ntt");
 
-  retval = PAPI_hl_region_begin("merged_neon_ntt");
+  retval = PAPI_hl_region_begin("neon_ntt");
   for (int j = 0; j < TEST1; j++)
   {
     neon_ntt(r1);
   }
-  retval = PAPI_hl_region_end("merged_neon_ntt");
+  retval = PAPI_hl_region_end("neon_ntt");
+
+  comp = compare(r_gold, r1, 256, "c_ntt vs neon_ntt");
+  if (comp)
+    return 1;
+
+  reduce(r_gold);
+  reduce(r1);
 
   // Test INTT
   retval = PAPI_hl_region_begin("c_invntt");
@@ -196,16 +279,18 @@ int main(void)
   }
   retval = PAPI_hl_region_end("c_invntt");
 
-  retval = PAPI_hl_region_begin("merged_neon_invntt");
+  retval = PAPI_hl_region_begin("neon_invntt");
   for (int j = 0; j < TEST1; j++)
   {
     neon_invntt(r1);
   }
-  retval = PAPI_hl_region_end("merged_neon_invntt");
+  retval = PAPI_hl_region_end("neon_invntt");
 
-  int comp = 0;
-  comp = compare(r_gold, r1, 256, "r_gold vs neon_invntt");
+  comp = compare(r_gold, r1, 256, "c_invntt vs neon_invntt");
   if (comp)
+    return 1;
+
+  if (retval)
     return 1;
 
   polyvec rvec_gold;
@@ -225,7 +310,7 @@ int main(void)
       poly_ntt(&rvec_gold.vec[j]);
       poly_neon_ntt(&rvec_test.vec[j]);
 
-      comp |= compare(&rvec_gold.vec[j].coeffs, &rvec_test.vec[j].coeffs, 256, "rvec_gold vs rvec_test");
+      comp |= compare(rvec_gold.vec[j].coeffs, rvec_test.vec[j].coeffs, 256, "rvec_gold vs rvec_test");
 
       if (comp)
       {
