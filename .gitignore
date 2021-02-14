@@ -1,3 +1,4 @@
+papi_hl_output*
 tvecs1024
 tvecs1024-90s
 tvecs512
@@ -24,6 +25,9 @@ neon/test_speed768keccak
 neon/test_speed1024keccak
 neon/autobuild
 neon/test.c
+neon/gen_ntt
+neon/neon_ntt
+neon/test
 ref/test_speedusec512
 ref/test_speedusec768
 ref/test_speedusec1024
@@ -32,3 +36,4 @@ ref/test_speed512keccak
 ref/test_speed768keccak
 ref/test_speed1024keccak
 ref/PQCgenKAT_kem
+
