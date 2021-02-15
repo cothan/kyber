@@ -2,15 +2,15 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include "api.h"
 #include "kex.h"
+#include "kem.h"
 #include "params.h"
 #include "indcpa.h"
 #include "poly.h"
 #include "polyvec.h"
 #include "cpucycles.h"
 #include "speed_print.h"
-#include "ntt.h"
+#include "neon_ntt.h"
 
 #define NTESTS 100000
 

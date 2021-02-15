@@ -49,19 +49,6 @@ int main()
 
   for(i=0;i<NTESTS;i++) {
     t[i] = cpucycles();
-    poly_tomsg(msg, &ap);
-  }
-  print_results("poly_tomsg: ", t, NTESTS);
-
-  for(i=0;i<NTESTS;i++) {
-    t[i] = cpucycles();
-    poly_frommsg(&ap, msg);
-  }
-  print_results("poly_frommsg: ", t, NTESTS);
-
-
-  for(i=0;i<NTESTS;i++) {
-    t[i] = cpucycles();
     poly_ntt(&ap);
   }
   print_results("NTT: ", t, NTESTS);
