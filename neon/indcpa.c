@@ -6,7 +6,7 @@
 #include "poly.h"
 #include "polyvec.h"
 #include "randombytes.h"
-#include "ntt.h"
+#include "neon_ntt.h"
 #include "symmetric.h"
 
 /*************************************************

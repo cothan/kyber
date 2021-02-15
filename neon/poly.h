@@ -54,10 +54,13 @@ void neon_poly_getnoise_eta2(poly *r,
                              const uint8_t seed[KYBER_SYMBYTES],
                              uint8_t nonce);
 
-#define poly_csubq KYBER_NAMESPACE(poly_csubq)
-void poly_csubq(poly *r);
-
 #define poly_frombytes KYBER_NAMESPACE(poly_frombytes)
 void poly_frombytes(poly *r, const uint8_t a[KYBER_POLYBYTES]);
+
+#define neon_poly_ntt KYBER_NAMESPACE(neon_poly_ntt)
+void neon_poly_ntt(poly *r);
+
+#define neon_poly_invntt_tomont KYBER_NAMESPACE(neon_poly_invntt_tomont)
+void neon_poly_invntt_tomont(poly *r);
 
 #endif

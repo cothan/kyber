@@ -34,11 +34,8 @@ void kyber_aes256ctr_prf(uint8_t *out, size_t outlen, const uint8_t key[32], uin
 #else
 
 #include "fips202.h"
-#include "fips202x2.h"
 
 typedef keccak_state xof_state;
-typedef keccakx2_state neon_xof_state;
-
 
 #define kyber_shake128_absorb KYBER_NAMESPACE(kyber_shake128_absorb)
 void kyber_shake128_absorb(keccak_state *s,
@@ -57,14 +54,19 @@ void kyber_shake256_prf(uint8_t *out, size_t outlen, const uint8_t key[KYBER_SYM
 #define xof_squeezeblocks(OUT, OUTBLOCKS, STATE) shake128_squeezeblocks(OUT, OUTBLOCKS, STATE)
 #define prf(OUT, OUTBYTES, KEY, NONCE) kyber_shake256_prf(OUT, OUTBYTES, KEY, NONCE)
 #define kdf(OUT, IN, INBYTES) shake256(OUT, KYBER_SSBYTES, IN, INBYTES)
+
 // NEON Definition
-#define neon_kyber_shake128_absorb KYBER_NAMESPACE(kyber_shake128_absorb)
+#include "fips202x2.h"
+
+typedef keccakx2_state neon_xof_state;
+
+#define neon_kyber_shake128_absorb KYBER_NAMESPACE(neon_kyber_shake128_absorb)
 void neon_kyber_shake128_absorb(keccakx2_state *s,
                                 const uint8_t seed[KYBER_SYMBYTES],
                                 uint8_t x1, uint8_t x2,
                                 uint8_t y1, uint8_t y2);
 
-#define neon_kyber_shake256_prf KYBER_NAMESPACE(kyber_shake256_prf)
+#define neon_kyber_shake256_prf KYBER_NAMESPACE(neon_kyber_shake256_prf)
 void neon_kyber_shake256_prf(uint8_t *out1, uint8_t *out2,
                              size_t outlen,
                              const uint8_t key[KYBER_SYMBYTES],

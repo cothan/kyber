@@ -27,8 +27,8 @@ void neon_polyvec_ntt(polyvec *r);
 #define neon_polyvec_invntt_to_mont KYBER_NAMESPACE(polyvec_invntt_to_mont)
 void neon_polyvec_invntt_to_mont(polyvec *r);
 
-#define neon_polyvec_add_reduce_csubq KYBER_NAMESPACE(polyvec_add_reduce_csubq)
-void neon_polyvec_add_reduce_csubq(polyvec *c, const polyvec *a);
+#define neon_polyvec_add_reduce KYBER_NAMESPACE(polyvec_add_reduce)
+void neon_polyvec_add_reduce(polyvec *c, const polyvec *a);
 
 #define neon_polyvec_acc_montgomery KYBER_NAMESPACE(polyvec_acc_montgomery)
 void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, const int to_mont);

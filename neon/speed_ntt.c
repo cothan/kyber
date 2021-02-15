@@ -6,7 +6,7 @@
 #include <assert.h>
 #include "polyvec.h"
 #include "params.h"
-#include "ntt.h"
+#include "neon_ntt.h"
 #include "reduce.h"
 
 // clang ntt.c reduce.c neon_ntt.c speed_ntt.c -o neon_ntt -O3 -g3 -Wall -Werror -Wextra -Wpedantic -lpapi
@@ -52,6 +52,7 @@ static int16_t fqmul(int16_t a, int16_t b) {
 *
 * Arguments:   - int16_t r[256]: pointer to input/output vector of elements of Zq
 **************************************************/
+static
 void ntt(int16_t r[256]) {
   unsigned int len, start, j, k;
   int16_t t, zeta;
@@ -78,6 +79,7 @@ void ntt(int16_t r[256]) {
 *
 * Arguments:   - int16_t r[256]: pointer to input/output vector of elements of Zq
 **************************************************/
+static
 void invntt(int16_t r[256]) {
   unsigned int start, len, j, k;
   int16_t t, zeta;
@@ -212,6 +214,7 @@ void poly_neon_ntt(poly *r)
   poly_reduce(r);
 }
 
+static
 void print_array(const int16_t *buf, int buflen, const char *string)
 {
     printf("%s: [", string);
@@ -222,6 +225,7 @@ void print_array(const int16_t *buf, int buflen, const char *string)
     printf("]\n");
 }
 
+static
 void reduce(int16_t r[256])
 {
   for (int i = 0; i < 256; i++)

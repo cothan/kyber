@@ -1,6 +1,6 @@
 #include <arm_neon.h>
 #include "params.h"
-#include "ntt.h"
+#include "neon_ntt.h"
 #include "reduce.h"
 
 /* Code to generate neon_zetas and neon_zetas_inv used in the number-theoretic transform: `gen_ntt.c` */
@@ -645,8 +645,8 @@ void neon_invntt(int16_t r[256])
     addsub(v3, 0, 2, 1, 3, t, 2);
 
     // 16, 17, 18, 19: 16 points
-    barret_lo(v0.val[2], v1.val[2], t, 0);
-    barret_lo(v2.val[2], v3.val[2], t, 2);
+    barrett_lo(v0.val[2], v1.val[2], t, 0);
+    barrett_lo(v2.val[2], v3.val[2], t, 2);
 
     vloadx4(z, &neon_zetas_inv[k + 96]);
 
@@ -679,8 +679,8 @@ void neon_invntt(int16_t r[256])
     addsub_twist(v3, t, 0, 1, 2, 3, z, 2);
 
     // 0, 1, 2, 3: 16 points
-    barret_lo(v0.val[0], v1.val[0], t, 0);
-    barret_lo(v2.val[0], v3.val[0], t, 2);
+    barrett_lo(v0.val[0], v1.val[0], t, 0);
+    barrett_lo(v2.val[0], v3.val[0], t, 2);
 
     z.val[0] = vdupq_n_s16(neon_zetas_inv[k + 128]);
     z.val[1] = vdupq_n_s16(neon_zetas_inv[k + 129]);
@@ -707,7 +707,7 @@ void neon_invntt(int16_t r[256])
     addsub_x4(v2, v3, t);
 
     // 4, 5, 6, 7: 8 points
-    barret_hi(v0.val[0], v2.val[0], t, 0);
+    barrett_hi(v0.val[0], v2.val[0], t, 0);
 
     z.val[0] = vdupq_n_s16(neon_zetas_inv[k + 132]);
     z.val[1] = vdupq_n_s16(neon_zetas_inv[k + 133]);
@@ -732,7 +732,7 @@ void neon_invntt(int16_t r[256])
     addsub_x4(v1, v3, t);
 
     // 8, 9, ... 15: 8 points
-    barret_lh(v0.val[1], t, 0);
+    barrett_lh(v0.val[1], t, 0);
 
     z.val[0] = vdupq_n_s16(neon_zetas_inv[k + 134]);
 

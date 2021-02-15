@@ -1,5 +1,7 @@
 #include <arm_neon.h>
 #include "params.h"
+#include "reduce.h"
+#include "neon_ntt.h"
 #include "poly.h"
 #include "polyvec.h"
 
