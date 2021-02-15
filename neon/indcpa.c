@@ -236,10 +236,12 @@ void gen_matrix(polyvec *a, const uint8_t seed[KYBER_SYMBYTES], int transposed)
   }
 
   // Last iteration [2][2]
-  if (transposed)
+  if (transposed){
     xof_absorb(&c_state, seed, 2, 2);
-  else
+  }
+  else{
     xof_absorb(&c_state, seed, 2, 2);
+  }
 
   xof_squeezeblocks(buf0, GEN_MATRIX_NBLOCKS, &c_state);
 
@@ -343,7 +345,7 @@ void indcpa_keypair(uint8_t pk[KYBER_INDCPA_PUBLICKEYBYTES],
     neon_polyvec_acc_montgomery(&pkpv.vec[i], &a[i], &skpv, 1);
   }
 
-  neon_polyvec_add_reduce_csubq(&pkpv, &e);
+  neon_polyvec_add_reduce(&pkpv, &e);
 
   pack_sk(sk, &skpv);
   pack_pk(pk, &pkpv, publicseed);
@@ -373,7 +375,7 @@ void indcpa_enc(uint8_t c[KYBER_INDCPA_BYTES],
 {
   unsigned int i;
   uint8_t seed[KYBER_SYMBYTES];
-  polyvec sp, pkpv, ep, at[KYBER_K], bp;
+  polyvec sp, pkpv, ep, at[KYBER_K], b;
   poly v, k, epp;
 
   unpack_pk(&pkpv, seed, pk);
@@ -411,18 +413,18 @@ void indcpa_enc(uint8_t c[KYBER_INDCPA_BYTES],
 
   // matrix-vector multiplication
   for(i=0;i<KYBER_K;i++)
-    neon_polyvec_acc_montgomery(&bp.vec[i], &at[i], &sp, 0);
+    neon_polyvec_acc_montgomery(&b.vec[i], &at[i], &sp, 0);
 
   neon_polyvec_acc_montgomery(&v, &pkpv, &sp, 0);
 
-  neon_polyvec_invntt_to_mont(&bp);
+  neon_polyvec_invntt_to_mont(&b);
   neon_invntt(v.coeffs);
 
-  neon_polyvec_add_reduce_csubq(&bp, &ep);
+  neon_polyvec_add_reduce(&b, &ep);
 
-  neon_poly_add_add_reduce_csubq(&v, &epp, &k);
+  neon_poly_add_add_reduce(&v, &epp, &k);
 
-  pack_ciphertext(c, &bp, &v);
+  pack_ciphertext(c, &b, &v);
 }
 
 /*************************************************
@@ -442,17 +444,17 @@ void indcpa_dec(uint8_t m[KYBER_INDCPA_MSGBYTES],
                 const uint8_t c[KYBER_INDCPA_BYTES],
                 const uint8_t sk[KYBER_INDCPA_SECRETKEYBYTES])
 {
-  polyvec bp, skpv;
+  polyvec b, skpv;
   poly v, mp;
 
-  unpack_ciphertext(&bp, &v, c);
+  unpack_ciphertext(&b, &v, c);
   unpack_sk(&skpv, sk);
 
-  neon_polyvec_ntt(&bp);
-  neon_polyvec_acc_montgomery(&mp, &skpv, &bp, 0);
+  neon_polyvec_ntt(&b);
+  neon_polyvec_acc_montgomery(&mp, &skpv, &b, 0);
   neon_invntt(mp.coeffs);
 
-  neon_poly_sub_reduce_csubq(&v, &mp);
+  neon_poly_sub_reduce(&v, &mp);
 
   poly_tomsg(m, &v);
 }
