@@ -1,10 +1,10 @@
 CC ?= /usr/bin/cc
-# CC = clang
+#CC = clang
 CFLAGS += -Wall -Wextra -Wpedantic -Wmissing-prototypes -Wredundant-decls \
-  -Wshadow -Wpointer-arith -fomit-frame-pointer -march=native -mtune=native -O3
-NISTFLAGS += -Wno-unused-result -mpopcnt -maes \
-  -march=native -mtune=native -O3 -fomit-frame-pointer
+  -Wshadow -Wpointer-arith -fomit-frame-pointer -mtune=native -O3 -march=native
+NISTFLAGS += -Wno-unused-result -mtune=native -O3 -fomit-frame-pointer -march=native
 RM = /bin/rm
+#LIBPAPI = lib/libpapi.a
 LIBPAPI = -lpapi
 
 SOURCES = kex.c kem.c indcpa.c polyvec.c neon_polyvec.c poly.c neon_poly.c neon_ntt.c cbd.c reduce.c  verify.c
