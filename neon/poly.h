@@ -30,14 +30,14 @@ void poly_tomsg(uint8_t msg[KYBER_INDCPA_MSGBYTES], const poly *r);
 
 #define neon_poly_reduce KYBER_NAMESPACE(poly_reduce)
 void neon_poly_reduce(poly *c);
-#define neon_poly_add_reduce_csubq KYBER_NAMESPACE(poly_add_reduce_csubq)
-void neon_poly_add_reduce_csubq(poly *c, const poly *a);
+#define neon_poly_add_reduce KYBER_NAMESPACE(poly_add_reduce_csubq)
+void neon_poly_add_reduce(poly *c, const poly *a);
 
-#define neon_poly_sub_reduce_csubq KYBER_NAMESPACE(poly_sub_reduce_csubq)
-void neon_poly_sub_reduce_csubq(poly *c, const poly *a);
+#define neon_poly_sub_reduce KYBER_NAMESPACE(poly_sub_reduce_csubq)
+void neon_poly_sub_reduce(poly *c, const poly *a);
 
-#define neon_poly_add_add_reduce_csubq KYBER_NAMESPACE(poly_add_add_reduce_csubq)
-void neon_poly_add_add_reduce_csubq(poly *c, const poly *a, const poly *b);
+#define neon_poly_add_add_reduce KYBER_NAMESPACE(poly_add_add_reduce_csubq)
+void neon_poly_add_add_reduce(poly *c, const poly *a, const poly *b);
 
 #define neon_poly_getnoise_eta1_2x KYBER_NAMESPACE(poly_getnoise_eta1_2x)
 void neon_poly_getnoise_eta1_2x(poly *vec1, poly *vec2,

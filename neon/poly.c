@@ -1,4 +1,4 @@
-#include <stdint.h>
+#include <arm_neon.h>
 #include "params.h"
 #include "poly.h"
 #include "ntt.h"
@@ -137,10 +137,39 @@ void poly_tobytes(uint8_t r[KYBER_POLYBYTES], const poly *a)
 **************************************************/
 void poly_frombytes(poly *r, const uint8_t a[KYBER_POLYBYTES])
 {
-  unsigned int i;
-  for(i=0;i<KYBER_N/2;i++) {
-    r->coeffs[2*i]   = ((a[3*i+0] >> 0) | ((uint16_t)a[3*i+1] << 8)) & 0xFFF;
-    r->coeffs[2*i+1] = ((a[3*i+1] >> 4) | ((uint16_t)a[3*i+2] << 4)) & 0xFFF;
+  uint8x16x3_t neon_buf;
+  uint16x8x4_t tmp;
+  int16x8x4_t value;
+  uint16x8_t const_0xfff;
+  const_0xfff = vdupq_n_u16(0xfff);
+
+  unsigned int i, j = 0;
+  for (i = 0; i < KYBER_POLYBYTES; i += 48)
+  {
+    neon_buf = vld3q_u8(&a[i]);
+
+    // Val0: 0-1 | 3-4 | 6-7| 9-10
+    tmp.val[0] = (uint16x8_t)vzip1q_u8(neon_buf.val[0], neon_buf.val[1]);
+    tmp.val[1] = (uint16x8_t)vzip2q_u8(neon_buf.val[0], neon_buf.val[1]);
+
+    tmp.val[0] = vandq_u16(tmp.val[0], const_0xfff);
+    tmp.val[1] = vandq_u16(tmp.val[1], const_0xfff);
+
+    // Val1: 1-2 | 4-5 | 7-8 | 10-11
+    tmp.val[2] = (uint16x8_t)vzip1q_u8(neon_buf.val[1], neon_buf.val[2]);
+    tmp.val[3] = (uint16x8_t)vzip2q_u8(neon_buf.val[1], neon_buf.val[2]);
+
+    tmp.val[2] = vshrq_n_u16(tmp.val[2], 4);
+    tmp.val[3] = vshrq_n_u16(tmp.val[3], 4);
+
+    // Final value
+    value.val[0] = (int16x8_t)vzip1q_u16(tmp.val[0], tmp.val[2]);
+    value.val[1] = (int16x8_t)vzip2q_u16(tmp.val[0], tmp.val[2]);
+    value.val[2] = (int16x8_t)vzip1q_u16(tmp.val[1], tmp.val[3]);
+    value.val[3] = (int16x8_t)vzip2q_u16(tmp.val[1], tmp.val[3]);
+
+    vst1q_s16_x4(&r->coeffs[j], value);
+    j += 32;
   }
 }
 
