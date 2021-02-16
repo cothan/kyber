@@ -677,7 +677,7 @@ void neon_invntt(int16_t r[256])
     addsub_twist(v3, t, 0, 1, 2, 3, z, 2);
 
     // 0, 1, 2, 3: 8 points
-    barrett_lo(v0.val[0], v3.val[0], t, 0);
+    barrett_lo(v1.val[0], v3.val[0], t, 0);
 
     z.val[0] = vdupq_n_s16(neon_zetas_inv[k + 128]);
     z.val[1] = vdupq_n_s16(neon_zetas_inv[k + 129]);
