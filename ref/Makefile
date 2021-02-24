@@ -1,9 +1,9 @@
 CC ?= /usr/bin/cc
 CFLAGS += -Wall -Wextra -Wpedantic -Wmissing-prototypes -Wredundant-decls \
-  -Wshadow -Wpointer-arith -O3 -fomit-frame-pointer
+  -Wshadow -Wpointer-arith -O3 -fomit-frame-pointer -mtune=native
 NISTFLAGS += -Wno-unused-result -O3 -fomit-frame-pointer
 RM = /bin/rm
-LIBPAPI = lib/libpapi.a
+# LIBPAPI = lib/libpapi.a
 
 SOURCES = kex.c kem.c indcpa.c polyvec.c poly.c ntt.c cbd.c reduce.c verify.c
 SOURCESKECCAK = $(SOURCES) fips202.c symmetric-shake.c
@@ -37,10 +37,10 @@ all: \
 speed: \
   test_speed512 \
   test_speed768 \
-  test_speed1024 \
-  test_speed512-90s \
-  test_speed768-90s \
-  test_speed1024-90s
+  test_speed1024
+#   test_speed512-90s \
+#   test_speed768-90s \
+#   test_speed1024-90s
 
 speed_keccak: \
   test_speed512keccak \
@@ -103,23 +103,23 @@ test_vectors768: $(SOURCESKECCAK) $(HEADERSKECCAK) test_vectors.c
 test_vectors1024: $(SOURCESKECCAK) $(HEADERSKECCAK) test_vectors.c
 		$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) test_vectors.c -o test_vectors1024
 
-test_speed512: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed_region.c randombytes.c
-		$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c cpucycles.c speed_print.c test_speed_region.c $(LIBPAPI) -o test_speed512
+test_speed512: $(SOURCESKECCAK) $(HEADERSKECCAK)  test_speed_region.c randombytes.c
+		$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c  test_speed_region.c $(LIBPAPI) -o test_speed512
 
-test_speed768: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed_region.c randombytes.c
-		$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) randombytes.c cpucycles.c speed_print.c test_speed_region.c $(LIBPAPI) -o test_speed768
+test_speed768: $(SOURCESKECCAK) $(HEADERSKECCAK)  test_speed_region.c randombytes.c
+		$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) randombytes.c  test_speed_region.c $(LIBPAPI) -o test_speed768
 
-test_speed1024: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed_region.c randombytes.c
-		$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c cpucycles.c speed_print.c test_speed_region.c $(LIBPAPI) -o test_speed1024
+test_speed1024: $(SOURCESKECCAK) $(HEADERSKECCAK)  test_speed_region.c randombytes.c
+		$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c  test_speed_region.c $(LIBPAPI) -o test_speed1024
 
-test_speed512keccak: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed_keccak.c randombytes.c
-		$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c cpucycles.c speed_print.c test_speed_keccak.c $(LIBPAPI) -o test_speed512keccak
+test_speed512keccak: $(SOURCESKECCAK) $(HEADERSKECCAK)  test_speed_keccak.c randombytes.c
+		$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c  test_speed_keccak.c $(LIBPAPI) -o test_speed512keccak
 
-test_speed768keccak: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed_keccak.c randombytes.c
-		$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) randombytes.c cpucycles.c speed_print.c test_speed_keccak.c $(LIBPAPI) -o test_speed768keccak
+test_speed768keccak: $(SOURCESKECCAK) $(HEADERSKECCAK)  test_speed_keccak.c randombytes.c
+		$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) randombytes.c  test_speed_keccak.c $(LIBPAPI) -o test_speed768keccak
 
-test_speed1024keccak: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed_keccak.c randombytes.c
-		$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c cpucycles.c speed_print.c test_speed_keccak.c $(LIBPAPI) -o test_speed1024keccak
+test_speed1024keccak: $(SOURCESKECCAK) $(HEADERSKECCAK)  test_speed_keccak.c randombytes.c
+		$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c  test_speed_keccak.c $(LIBPAPI) -o test_speed1024keccak
 
 libpqcrystals_kyber512-90s_ref.so: $(SOURCES) $(HEADERS) symmetric-aes.c
 		$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=2 -DKYBER_90S $(SOURCES) symmetric-aes.c -o libpqcrystals_kyber512-90s_ref.so
@@ -219,3 +219,10 @@ clean:
 		-$(RM) -rf test_speed512keccak
 		-$(RM) -rf test_speed768keccak
 		-$(RM) -rf test_speed1024keccak
+
+
+bench:
+	./test_speed512
+	./test_speed768
+	./test_speed1024
+	./test_speed_ntt

@@ -8,11 +8,15 @@
 #include "indcpa.h"
 #include "poly.h"
 #include "polyvec.h"
-#include "cpucycles.h"
-#include "speed_print.h"
+// #include "cpucycles.h"
+// #include "speed_print.h"
+#include <time.h>
+#include "print.h"
 #include "neon_ntt.h"
 
-#define NTESTS 100000
+// micro second 
+#define NTESTS 1000000
+// #define NTESTS (1 << 27)
 
 uint64_t t[NTESTS];
 uint8_t seed[KYBER_SYMBYTES] = {0};
@@ -30,67 +34,99 @@ int main()
   unsigned char msg[KYBER_INDCPA_MSGBYTES] = {0};
   polyvec matrix[KYBER_K];
   poly ap, bp;
+  clock_t start, end; 
 
-  PAPI_hl_region_begin("gen_matrix");
+  // PAPI_hl_region_begin("gen_matrix");
+  start = clock();
   for(i=0;i<NTESTS;i++) {
     gen_matrix(matrix, seed, 0);
   }
-  PAPI_hl_region_end("gen_matrix");
+  end =  clock() - start;
+  print("gen_matrix:", ((double) end)/CLOCKS_PER_SEC);
 
-  PAPI_hl_region_begin("neon_poly_getnoise_eta1_2x");
+  // PAPI_hl_region_end("gen_matrix");
+
+  // PAPI_hl_region_begin("neon_poly_getnoise_eta1_2x");
+  start = clock();
   for(i=0;i<NTESTS;i++) {
     neon_poly_getnoise_eta1_2x(&ap, &bp, seed, 0, 1);
   }
-  PAPI_hl_region_end("neon_poly_getnoise_eta1_2x");
+  end = clock() - start;
+  print("neon_poly_getnoise_eta1_2x:", ((double) end)/CLOCKS_PER_SEC);
+  // PAPI_hl_region_end("neon_poly_getnoise_eta1_2x");
 
-  PAPI_hl_region_begin("neon_poly_getnoise_eta2");
+  // PAPI_hl_region_begin("neon_poly_getnoise_eta2");
+  start = clock();
   for(i=0;i<NTESTS;i++) {
     neon_poly_getnoise_eta2(&ap, seed, 0);
   }
-  PAPI_hl_region_end("neon_poly_getnoise_eta2");
+  end = clock() - start; 
+  print("neon_poly_getnoise_eta2:", ((double) end)/CLOCKS_PER_SEC);
+  // PAPI_hl_region_end("neon_poly_getnoise_eta2");
 
-  PAPI_hl_region_begin("poly_tomsg");
+  // PAPI_hl_region_begin("poly_tomsg");
+  start = clock();
   for(i=0;i<NTESTS;i++) {
     poly_tomsg(msg, &ap);
   }
-  PAPI_hl_region_end("poly_tomsg");
+  end = clock() - start;
+  print("poly_tomsg:", ((double) end)/CLOCKS_PER_SEC);
+  // PAPI_hl_region_end("poly_tomsg");
 
-  PAPI_hl_region_begin("poly_frommsg");
+  // PAPI_hl_region_begin("poly_frommsg");
+  start = clock(); 
   for(i=0;i<NTESTS;i++) {
     poly_frommsg(&ap, msg);
   }
-  PAPI_hl_region_end("poly_frommsg");
+  end = clock() - start;
+  print("poly_frommsg:", ((double) end)/CLOCKS_PER_SEC);
+  // PAPI_hl_region_end("poly_frommsg");
 
 
-  PAPI_hl_region_begin("neon_ntt");
+  // PAPI_hl_region_begin("neon_ntt");
+  start = clock();
   for(i=0;i<NTESTS;i++) {
     neon_ntt(ap.coeffs);
   }
-  PAPI_hl_region_end("neon_ntt");
+  end = clock() - start; 
+  print("neon_ntt:", ((double) end)/CLOCKS_PER_SEC);
+  // PAPI_hl_region_end("neon_ntt");
 
-  PAPI_hl_region_begin("neon_invntt");
+  // PAPI_hl_region_begin("neon_invntt");
+  start = clock();
   for(i=0;i<NTESTS;i++) {
     neon_invntt(ap.coeffs);
   }
-  PAPI_hl_region_end("neon_invntt");
+  end = clock() - start; 
+  print("neon_invntt:", ((double) end)/CLOCKS_PER_SEC);
+  // PAPI_hl_region_end("neon_invntt");
 
-  PAPI_hl_region_begin("crypto_kem_keypair");
+  // PAPI_hl_region_begin("crypto_kem_keypair");
+  start = clock();
   for(i=0;i<NTESTS;i++) {
     crypto_kem_keypair(pk, sk);
   }
-  PAPI_hl_region_end("crypto_kem_keypair");
+  end = clock() - start; 
+  print("crypto_kem_keypair:", ((double) end)/CLOCKS_PER_SEC);
+  // PAPI_hl_region_end("crypto_kem_keypair");
 
-  PAPI_hl_region_begin("crypto_kem_enc");
+  // PAPI_hl_region_begin("crypto_kem_enc");
+  start = clock(); 
   for(i=0;i<NTESTS;i++) {
     crypto_kem_enc(ct, key, pk);
   }
-  PAPI_hl_region_end("crypto_kem_enc");
+  end = clock() - start; 
+  print("crypto_kem_enc:", ((double) end)/CLOCKS_PER_SEC);
+  // PAPI_hl_region_end("crypto_kem_enc");
 
-  PAPI_hl_region_begin("crypto_kem_dec");
+  // PAPI_hl_region_begin("crypto_kem_dec");
+  start = clock(); 
   for(i=0;i<NTESTS;i++) {
     crypto_kem_dec(key, ct, sk);
   }
-  PAPI_hl_region_end("crypto_kem_dec");
+  end = clock() - start; 
+  print("crypto_kem_enc:", ((double) end)/CLOCKS_PER_SEC);
+  // PAPI_hl_region_end("crypto_kem_dec");
 
   /*
   PAPI_hl_region_begin("kex_uake_initA");

@@ -1,4 +1,3 @@
-#include <papi.h>
 #include <stdio.h>
 #include <arm_neon.h>
 #include <sys/random.h>
@@ -8,6 +7,8 @@
 #include "params.h"
 #include "neon_ntt.h"
 #include "reduce.h"
+#include "print.h"
+#include <time.h>
 
 // clang ntt.c reduce.c neon_ntt.c speed_ntt.c -o neon_ntt -O3 -g3 -Wall -Werror -Wextra -Wpedantic -lpapi
 // gcc   ntt.c reduce.c neon_ntt.c speed_ntt.c -o neon_ntt -O3 -g3 -Wall -Werror -Wextra -Wpedantic -lpapi
@@ -242,6 +243,7 @@ int main(void)
   int16_t r_gold[256], r1[256], r2[256];
   int retval;
   int comp = 0;
+  clock_t start, end; 
 
   getrandom(r_gold, sizeof(r_gold), 0);
   for (int i = 0; i < 256; i++)
@@ -254,19 +256,25 @@ int main(void)
   memcpy(r2, r_gold, sizeof(r_gold));
 
   // Test NTT
-  retval = PAPI_hl_region_begin("c_ntt");
+  // retval = PAPI_hl_region_begin("c_ntt");
+  start = clock();
   for (int j = 0; j < TEST1; j++)
   {
     ntt(r_gold);
   }
-  retval = PAPI_hl_region_end("c_ntt");
+  end =  clock() - start;
+  print("ntt:", ((double) end)/CLOCKS_PER_SEC);
+  // retval = PAPI_hl_region_end("c_ntt");
 
-  retval = PAPI_hl_region_begin("neon_ntt");
+  // retval = PAPI_hl_region_begin("neon_ntt");
+  start = clock();
   for (int j = 0; j < TEST1; j++)
   {
     neon_ntt(r1);
   }
-  retval = PAPI_hl_region_end("neon_ntt");
+  end =  clock() - start;
+  print("neon_ntt:", ((double) end)/CLOCKS_PER_SEC);
+  // retval = PAPI_hl_region_end("neon_ntt");
 
   comp = compare(r_gold, r1, 256, "c_ntt vs neon_ntt");
   if (comp)
@@ -276,19 +284,25 @@ int main(void)
   reduce(r1);
 
   // Test INTT
-  retval = PAPI_hl_region_begin("c_invntt");
+  // retval = PAPI_hl_region_begin("c_invntt");
+  start = clock();
   for (int j = 0; j < TEST1; j++)
   {
     invntt(r_gold);
   }
-  retval = PAPI_hl_region_end("c_invntt");
+  end =  clock() - start;
+  print("invntt:", ((double) end)/CLOCKS_PER_SEC);
+  // retval = PAPI_hl_region_end("c_invntt");
 
-  retval = PAPI_hl_region_begin("neon_invntt");
+  // retval = PAPI_hl_region_begin("neon_invntt");
+  start = clock();
   for (int j = 0; j < TEST1; j++)
   {
     neon_invntt(r1);
   }
-  retval = PAPI_hl_region_end("neon_invntt");
+  end =  clock() - start;
+  print("neon_invntt:", ((double) end)/CLOCKS_PER_SEC);
+  // retval = PAPI_hl_region_end("neon_invntt");
 
   comp = compare(r_gold, r1, 256, "c_invntt vs neon_invntt");
   if (comp)

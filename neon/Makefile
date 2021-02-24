@@ -1,11 +1,11 @@
+#CC ?= /usr/bin/cc -march=native
 CC ?= /usr/bin/cc
-# CC = clang
 CFLAGS += -Wall -Wextra -Wpedantic -Wmissing-prototypes -Wredundant-decls \
-  -Wshadow -Wpointer-arith -fomit-frame-pointer -march=native -mtune=native -O3
+  -Wshadow -Wpointer-arith -fomit-frame-pointer -mtune=native -O3
 NISTFLAGS += -Wno-unused-result -mpopcnt -maes \
-  -march=native -mtune=native -O3 -fomit-frame-pointer
+   -mtune=native -O3 -fomit-frame-pointer
 RM = /bin/rm
-LIBPAPI = lib/libpapi.a
+# LIBPAPI = lib/libpapi.a
 
 SOURCES = kex.c kem.c indcpa.c polyvec.c neon_polyvec.c poly.c neon_poly.c neon_ntt.c cbd.c reduce.c  verify.c
 SOURCESKECCAK = $(SOURCES) fips202x2.c fips202.c neon_symmetric-shake.c symmetric-shake.c rejsample.c
@@ -102,23 +102,23 @@ test_vectors768: $(SOURCESKECCAK) $(HEADERSKECCAK) test_vectors.c
 test_vectors1024: $(SOURCESKECCAK) $(HEADERSKECCAK) test_vectors.c
 	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) test_vectors.c -o test_vectors1024
 
-test_speed512: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed_region.c randombytes.c
-	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c cpucycles.c speed_print.c test_speed_region.c $(LIBPAPI) -o test_speed512
+test_speed512: $(SOURCESKECCAK) $(HEADERSKECCAK) test_speed_region.c randombytes.c
+	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c test_speed_region.c $(LIBPAPI) -o test_speed512
 
-test_speed768: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed_region.c randombytes.c
-	$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) randombytes.c cpucycles.c speed_print.c test_speed_region.c $(LIBPAPI) -o test_speed768
+test_speed768: $(SOURCESKECCAK) $(HEADERSKECCAK) test_speed_region.c randombytes.c
+	$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) randombytes.c test_speed_region.c $(LIBPAPI) -o test_speed768
 
-test_speed1024: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed_region.c randombytes.c
-	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c cpucycles.c speed_print.c test_speed_region.c $(LIBPAPI) -o test_speed1024
+test_speed1024: $(SOURCESKECCAK) $(HEADERSKECCAK) test_speed_region.c randombytes.c
+	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c test_speed_region.c $(LIBPAPI) -o test_speed1024
 
-test_speed512keccak: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed_keccak.c randombytes.c
-	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c cpucycles.c speed_print.c test_speed_keccak.c $(LIBPAPI) -o test_speed512keccak
+test_speed512keccak: $(SOURCESKECCAK) $(HEADERSKECCAK) speed_print.h speed_print.c test_speed_keccak.c randombytes.c
+	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c test_speed_keccak.c $(LIBPAPI) -o test_speed512keccak
 
-test_speed768keccak: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed_keccak.c randombytes.c
-	$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) randombytes.c cpucycles.c speed_print.c test_speed_keccak.c $(LIBPAPI) -o test_speed768keccak
+test_speed768keccak: $(SOURCESKECCAK) $(HEADERSKECCAK) speed_print.h speed_print.c test_speed_keccak.c randombytes.c
+	$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) randombytes.c test_speed_keccak.c $(LIBPAPI) -o test_speed768keccak
 
-test_speed1024keccak: $(SOURCESKECCAK) $(HEADERSKECCAK) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed_keccak.c randombytes.c
-	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c cpucycles.c speed_print.c test_speed_keccak.c $(LIBPAPI) -o test_speed1024keccak
+test_speed1024keccak: $(SOURCESKECCAK) $(HEADERSKECCAK) speed_print.h speed_print.c test_speed_keccak.c randombytes.c
+	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c test_speed_keccak.c $(LIBPAPI) -o test_speed1024keccak
 
 test_speed_ntt: neon_ntt.c reduce.c neon_ntt.c speed_ntt.c
 	$(CC) $(CFLAGS) reduce.c neon_ntt.c speed_ntt.c $(LIBPAPI) -o test_speed_ntt
