@@ -37,3 +37,4 @@ ref/test_speed768keccak
 ref/test_speed1024keccak
 ref/PQCgenKAT_kem
 
+avx2/result.md
