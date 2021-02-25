@@ -1,7 +1,7 @@
-CC ?= /usr/bin/cc
+# CC ?= /usr/bin/cc
+CC = clang 
 CFLAGS += -Wall -Wextra -Wpedantic -Wmissing-prototypes -Wredundant-decls \
-  -Wshadow -Wpointer-arith -mavx2 -mbmi2 -mpopcnt -maes \
-  -march=native -mtune=native -O3 -fomit-frame-pointer
+  -Wshadow -Wpointer-arith -mavx2 -mbmi2 -mpopcnt -maes -mtune=native -O3 -fomit-frame-pointer
 NISTFLAGS += -Wno-unused-result -mavx2 -mbmi2 -mpopcnt -maes \
   -march=native -mtune=native -O3 -fomit-frame-pointer
 RM = /bin/rm
@@ -202,3 +202,8 @@ clean:
 	-$(RM) -rf test_speed768-90s
 	-$(RM) -rf test_speed1024-90s
 	-$(RM) -rf keccak4x/KeccakP-1600-times4-SIMD256.o
+
+bench:
+	./test_speed512 
+	./test_speed768
+	./test_speed1024
