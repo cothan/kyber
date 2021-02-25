@@ -1,7 +1,7 @@
-CC ?= /usr/bin/cc
-# CC = clang
+# CC ?= /usr/bin/cc
+CC = clang
 CFLAGS += -Wall -Wextra -Wpedantic -Wmissing-prototypes -Wredundant-decls \
-  -Wshadow -Wpointer-arith -fomit-frame-pointer -march=native -mtune=native -O3
+  -Wshadow -Wpointer-arith -fomit-frame-pointer -mtune=native -O3 # -march=native
 NISTFLAGS += -Wno-unused-result -mpopcnt -maes \
   -march=native -mtune=native -O3 -fomit-frame-pointer
 RM = /bin/rm
@@ -227,10 +227,10 @@ clean:
 	-$(RM) -rf test_speed_ntt
 
 bench:
-	./test_speed512
-	./test_speed768
-	./test_speed1024
-	./test_speed_ntt
+	./test_speed512 ; cat papi_hl_output/rank* | grep TOT_CYC
+	./test_speed768 ; cat papi_hl_output/rank* | grep TOT_CYC
+	./test_speed1024 ; cat papi_hl_output/rank* | grep TOT_CYC
+	./test_speed_ntt ; cat papi_hl_output/rank* | grep TOT_CYC
 
 bench_keccak:
 	taskset 0x1 ./test_speed512keccak
