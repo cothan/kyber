@@ -47,7 +47,7 @@ int main()
     gen_matrix(matrix, seed, 0);
   }
   TIME(stop);
-  ns = CALC(start, end);
+  ns = CALC(start, stop);
   print("gen_matrix:", ns);
   // PAPI_hl_region_end("gen_matrix");
 
@@ -57,7 +57,7 @@ int main()
     poly_getnoise_eta1(&ap, seed, 1);
   }
   TIME(stop);
-  ns = CALC(start, end);
+  ns = CALC(start, stop);
   print("poly_getnoise_eta1:", ns);
   // PAPI_hl_region_end("poly_getnoise_eta1");
 
@@ -67,7 +67,7 @@ int main()
     poly_getnoise_eta2(&ap, seed, 0);
   }
   TIME(stop);
-  ns = CALC(start, end);
+  ns = CALC(start, stop);
   print("poly_getnoise_eta2:", ns);
   // PAPI_hl_region_end("poly_getnoise_eta2");
 
@@ -77,7 +77,7 @@ int main()
     poly_tomsg(msg, &ap);
   }
   TIME(stop);
-  ns = CALC(start, end);
+  ns = CALC(start, stop);
   print("poly_tomsg:", ns);
   // PAPI_hl_region_end("poly_tomsg");
 
@@ -87,7 +87,7 @@ int main()
     poly_frommsg(&ap, msg);
   }
   TIME(stop);
-  ns = CALC(start, end);
+  ns = CALC(start, stop);
   print("poly_frommsg:", ns);
   // PAPI_hl_region_end("poly_frommsg");
 
@@ -98,7 +98,7 @@ int main()
     ntt(ap.coeffs);
   }
   TIME(stop);
-  ns = CALC(start, end);
+  ns = CALC(start, stop);
   print("ref_ntt:", ns);
   // PAPI_hl_region_end("ref_ntt");
 
@@ -108,7 +108,7 @@ int main()
     invntt(ap.coeffs);
   }
   TIME(stop);
-  ns = CALC(start, end);
+  ns = CALC(start, stop);
   print("ref_invntt:", ns);
   // PAPI_hl_region_end("ref_invntt");
 
@@ -118,7 +118,7 @@ int main()
     crypto_kem_keypair(pk, sk);
   }
   TIME(stop);
-  ns = CALC(start, end);
+  ns = CALC(start, stop);
   print("crypto_kem_keypair:", ns);
   // PAPI_hl_region_end("crypto_kem_keypair");
 
@@ -128,7 +128,7 @@ int main()
     crypto_kem_enc(ct, key, pk);
   }
   TIME(stop);
-  ns = CALC(start, end);
+  ns = CALC(start, stop);
   print("crypto_kem_enc:", ns);
   // PAPI_hl_region_end("crypto_kem_enc");
 
@@ -138,7 +138,7 @@ int main()
     crypto_kem_dec(key, ct, sk);
   }
   TIME(stop);
-  ns = CALC(start, end);
+  ns = CALC(start, stop);
   print("crypto_kem_dec:", ns);
   // PAPI_hl_region_end("crypto_kem_dec");
 
