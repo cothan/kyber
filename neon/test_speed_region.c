@@ -19,7 +19,7 @@ uint8_t seed[KYBER_SYMBYTES] = {0};
 #define TIME(s) clock_gettime(CLOCK_MONOTONIC_RAW, &s);
 // Result is nanosecond per call 
 #define  CALC(start, stop) \
-  (double) ((stop.tv_sec - start.tv_sec) * 1000000000 + (stop.tv_nsec - start.tv_nsec)) / NTESTS;
+  ((double) ((stop.tv_sec - start.tv_sec) * 1000000000 + (stop.tv_nsec - start.tv_nsec))) / NTESTS;
 
 int main()
 {
