@@ -14,7 +14,7 @@
 #include <time.h>
 #include "print.h"
 
-#define NTESTS 10000000
+#define NTESTS 1000000
 
 uint8_t seed[KYBER_SYMBYTES] = {0};
 

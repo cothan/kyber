@@ -134,7 +134,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("crypto_kem_enc:", ns);
+  print("crypto_kem_dec:", ns);
 
 
   return 0;

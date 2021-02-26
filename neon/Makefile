@@ -39,8 +39,8 @@ all: \
 speed: \
   test_speed512 \
   test_speed768 \
-  test_speed1024 \
-  test_speed_ntt
+  test_speed1024
+#   test_speed_ntt
 #   test_speed512-90s \
 #   test_speed768-90s \
 #   test_speed1024-90s
@@ -227,10 +227,12 @@ clean:
 	-$(RM) -rf test_speed_ntt
 
 bench:
-	./test_speed512
+	sudo cpupower frequency-set --governor performance
+	./test_speed512 
 	./test_speed768
 	./test_speed1024
-	./test_speed_ntt
+	sudo cpupower frequency-set --governor powersave
+	echo "DONE"
 
 bench_keccak:
 	taskset 0x1 ./test_speed512keccak
