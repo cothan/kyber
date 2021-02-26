@@ -15,6 +15,27 @@
 
 uint8_t seed[KYBER_SYMBYTES] = {0};
 
+static 
+void VectorVectorMul(poly *mp, polyvec *b, polyvec *skpv)
+{
+  polyvec_ntt(b);
+  polyvec_basemul_acc_montgomery(mp, skpv, b, 0);
+  poly_invntt_tomont(mp);
+}
+
+static 
+void MatrixVectorMul(polyvec at[KYBER_K], polyvec *sp, polyvec *b)
+{
+  polyvec_ntt(sp);
+  // matrix-vector multiplication
+  for(int i=0;i<KYBER_K;i++)
+    polyvec_basemul_acc_montgomery(&b->vec[i], &at[i], sp, 0);
+
+  polyvec_invntt_tomont(b);
+}
+
+
+
 int main()
 {
   unsigned int i;
@@ -27,6 +48,7 @@ int main()
   // unsigned char kexkey[KEX_SSBYTES] = {0};
   unsigned char msg[KYBER_INDCPA_MSGBYTES] = {0};
   polyvec matrix[KYBER_K];
+  polyvec sp, b;
   poly ap;
   // poly bp;
 
@@ -90,6 +112,21 @@ int main()
     crypto_kem_dec(key, ct, sk);
   }
   PAPI_hl_region_end("crypto_kem_dec");
+
+
+  PAPI_hl_region_begin("VectorVectorMul");
+  for(i=0;i<NTESTS;i++) {
+    VectorVectorMul(&ap, &sp, &b);
+  }
+  PAPI_hl_region_end("VectorVectorMul");
+
+  
+  PAPI_hl_region_begin("MatrixVectorMul");
+  for(i=0;i<NTESTS;i++) {
+    MatrixVectorMul(matrix, &sp, &b);
+  }
+  PAPI_hl_region_end("MatrixVectorMul");
+
 
   /*
   PAPI_hl_region_begin("kex_uake_initA");
