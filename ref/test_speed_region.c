@@ -16,7 +16,12 @@
 // micro second 
 #define NTESTS 1000000
 
-uint64_t t[NTESTS];
+#define TIME(s) clock_gettime(CLOCK_MONOTONIC_RAW, &s);
+// Result is nanosecond per call 
+#define  CALC(start, stop) \
+  ((double) ((stop.tv_sec - start.tv_sec) * 1000000000 + (stop.tv_nsec - start.tv_nsec))) / NTESTS;
+
+
 uint8_t seed[KYBER_SYMBYTES] = {0};
 
 int main()
@@ -32,98 +37,109 @@ int main()
   unsigned char msg[KYBER_INDCPA_MSGBYTES] = {0};
   polyvec matrix[KYBER_K];
   poly ap;
-  // poly bp;
-  clock_t start, end; 
+  struct timespec start, stop;
+  long ns;
+
 
   // PAPI_hl_region_begin("gen_matrix");
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     gen_matrix(matrix, seed, 0);
   }
-  end =  clock() - start;
-  print("gen_matrix:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, end);
+  print("gen_matrix:", ns);
   // PAPI_hl_region_end("gen_matrix");
 
   // PAPI_hl_region_begin("poly_getnoise_eta1");
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     poly_getnoise_eta1(&ap, seed, 1);
   }
-  end =  clock() - start;
-  print("poly_getnoise_eta1:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, end);
+  print("poly_getnoise_eta1:", ns);
   // PAPI_hl_region_end("poly_getnoise_eta1");
 
   // PAPI_hl_region_begin("poly_getnoise_eta2");
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     poly_getnoise_eta2(&ap, seed, 0);
   }
-  end =  clock() - start;
-  print("poly_getnoise_eta2:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, end);
+  print("poly_getnoise_eta2:", ns);
   // PAPI_hl_region_end("poly_getnoise_eta2");
 
   // PAPI_hl_region_begin("poly_tomsg");
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     poly_tomsg(msg, &ap);
   }
-  end =  clock() - start;
-  print("poly_tomsg:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, end);
+  print("poly_tomsg:", ns);
   // PAPI_hl_region_end("poly_tomsg");
 
   // PAPI_hl_region_begin("poly_frommsg");
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     poly_frommsg(&ap, msg);
   }
-  end =  clock() - start;
-  print("poly_frommsg:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, end);
+  print("poly_frommsg:", ns);
   // PAPI_hl_region_end("poly_frommsg");
 
 
   // PAPI_hl_region_begin("ref_ntt");
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     ntt(ap.coeffs);
   }
-  end =  clock() - start;
-  print("ref_ntt:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, end);
+  print("ref_ntt:", ns);
   // PAPI_hl_region_end("ref_ntt");
 
   // PAPI_hl_region_begin("ref_invntt");
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     invntt(ap.coeffs);
   }
-  end =  clock() - start;
-  print("ref_invntt:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, end);
+  print("ref_invntt:", ns);
   // PAPI_hl_region_end("ref_invntt");
 
   // PAPI_hl_region_begin("crypto_kem_keypair");
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     crypto_kem_keypair(pk, sk);
   }
-  end =  clock() - start;
-  print("crypto_kem_keypair:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, end);
+  print("crypto_kem_keypair:", ns);
   // PAPI_hl_region_end("crypto_kem_keypair");
 
   // PAPI_hl_region_begin("crypto_kem_enc");
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     crypto_kem_enc(ct, key, pk);
   }
-  end =  clock() - start;
-  print("crypto_kem_enc:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, end);
+  print("crypto_kem_enc:", ns);
   // PAPI_hl_region_end("crypto_kem_enc");
 
   // PAPI_hl_region_begin("crypto_kem_dec");
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     crypto_kem_dec(key, ct, sk);
   }
-  end =  clock() - start;
-  print("crypto_kem_dec:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, end);
+  print("crypto_kem_dec:", ns);
   // PAPI_hl_region_end("crypto_kem_dec");
 
   /*
