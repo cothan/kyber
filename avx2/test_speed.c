@@ -14,7 +14,7 @@
 #include <time.h>
 #include "print.h"
 
-#define NTESTS 1000000000
+#define NTESTS 10000000
 
 uint8_t seed[KYBER_SYMBYTES] = {0};
 
@@ -23,6 +23,12 @@ uint8_t seed[KYBER_SYMBYTES] = {0};
 void randombytes(__attribute__((unused)) uint8_t *r, __attribute__((unused)) size_t len) {
   return;
 }
+
+#define TIME(s) clock_gettime(CLOCK_MONOTONIC_RAW, &s);
+// Result is nanosecond per call 
+#define  CALC(start, stop) \
+  ((double) ((stop.tv_sec - start.tv_sec) * 1000000000 + (stop.tv_nsec - start.tv_nsec))) / NTESTS;
+
 
 int main()
 {
@@ -36,146 +42,167 @@ int main()
   uint8_t kexkey[KEX_SSBYTES];
   polyvec matrix[KYBER_K];
   poly ap;
-  clock_t start, end;
+  struct timespec start, stop;
+  long ns;
+
 #ifndef KYBER_90S
   poly bp, cp, dp;
 #endif
 
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     gen_matrix(matrix, seed, 0);
   }
-  end = clock() - start;
-  print("gen_matrix:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, stop);
+  print("gen_matrix:", ns);
 
 
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     poly_getnoise_eta1(&ap, seed, 0);
   }
-  end = clock() - start;
-  print("poly_getnoise_eta1:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, stop);
+  print("poly_getnoise_eta1:", ns);
 
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     poly_getnoise_eta2(&ap, seed, 0);
   }
-  end = clock() - start;
-  print("poly_getnoise_eta2:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, stop);
+  print("poly_getnoise_eta2:", ns);
 
 #ifndef KYBER_90S
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     poly_getnoise_eta1_4x(&ap, &bp, &cp, &dp, seed, 0, 1, 2, 3);
   }
-  end = clock() - start;
-  print("poly_getnoise_eta1_4x:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, stop);
+  print("poly_getnoise_eta1_4x:", ns);
 #endif
 
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     poly_ntt(&ap);
   }
-  end = clock() - start;
-  print("poly_ntt:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, stop);
+  print("poly_ntt:", ns);
 
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     poly_invntt_tomont(&ap);
   }
-  end = clock() - start;
-  print("poly_invntt_tomont:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, stop);
+  print("poly_invntt_tomont:", ns);
 
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     polyvec_basemul_acc_montgomery(&ap, &matrix[0], &matrix[1]);
   }
-  end = clock() - start;
-  print("polyvec_basemul_acc_montgomery:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, stop);
+  print("polyvec_basemul_acc_montgomery:", ns);
 
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     poly_tomsg(ct,&ap);
   }
-  end = clock() - start;
-  print("poly_tomsg:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, stop);
+  print("poly_tomsg:", ns);
   
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     poly_frommsg(&ap,ct);
   }
-  end = clock() - start;
-  print("poly_frommsg:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, stop);
+  print("poly_frommsg:", ns);
 
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     poly_compress(ct,&ap);
   }
-  end = clock() - start;
-  print("poly_compress:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, stop);
+  print("poly_compress:", ns);
   
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     poly_decompress(&ap,ct);
   }
-  end = clock() - start;
-  print("poly_decompress:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, stop);
+  print("poly_decompress:", ns);
 
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     polyvec_compress(ct,&matrix[0]);
   }
-  end = clock() - start;
-  print("polyvec_compress:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, stop);
+  print("polyvec_compress:", ns);
 
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     polyvec_decompress(&matrix[0],ct);
   }
-  end = clock() - start;
-  print("polyvec_decompress:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, stop);
+  print("polyvec_decompress:", ns);
 
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     indcpa_keypair(pk, sk);
   }
-  end = clock() - start;
-  print("indcpa_keypair:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, stop);
+  print("indcpa_keypair:", ns);
   
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     indcpa_enc(ct, key, pk, seed);
   }
-  end = clock() - start;
-  print("indcpa_enc:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, stop);
+  print("indcpa_enc:", ns);
 
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     indcpa_dec(key, ct, sk);
   }
-  end = clock() - start;
-  print("indcpa_dec:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, stop);
+  print("indcpa_dec:", ns);
 
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     crypto_kem_keypair(pk, sk);
   }
-  end = clock() - start;
-  print("crypto_kem_keypair:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, stop);
+  print("crypto_kem_keypair:", ns);
   
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     crypto_kem_enc(ct, key, pk);
   }
-  end = clock() - start;
-  print("crypto_kem_enc:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, stop);
+  print("crypto_kem_enc:", ns);
   
-  start = clock();
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     crypto_kem_dec(key, ct, sk);
   }
-  end = clock() - start;
-  print("crypto_kem_dec:", ((double) end)/CLOCKS_PER_SEC);
+  TIME(stop);
+  ns = CALC(start, stop);
+  print("crypto_kem_dec:", ns);
   
 /* 
   for(i=0;i<NTESTS;i++) {

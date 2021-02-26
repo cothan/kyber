@@ -204,6 +204,9 @@ clean:
 	-$(RM) -rf keccak4x/KeccakP-1600-times4-SIMD256.o
 
 bench:
+	sudo cpupower frequency-set --governor performance
 	./test_speed512 
 	./test_speed768
 	./test_speed1024
+	sudo cpupower frequency-set --governor powersave
+	echo "DONE"
