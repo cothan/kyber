@@ -19,7 +19,7 @@ static
 void VectorVectorMul(poly *mp, polyvec *b, polyvec *skpv)
 {
   polyvec_ntt(b);
-  polyvec_basemul_acc_montgomery(mp, skpv, b, 0);
+  polyvec_basemul_acc_montgomery(mp, skpv, b);
   poly_invntt_tomont(mp);
 }
 
@@ -29,7 +29,7 @@ void MatrixVectorMul(polyvec at[KYBER_K], polyvec *sp, polyvec *b)
   polyvec_ntt(sp);
   // matrix-vector multiplication
   for(int i=0;i<KYBER_K;i++)
-    polyvec_basemul_acc_montgomery(&b->vec[i], &at[i], sp, 0);
+    polyvec_basemul_acc_montgomery(&b->vec[i], &at[i], sp);
 
   polyvec_invntt_tomont(b);
 }
