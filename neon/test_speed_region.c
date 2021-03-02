@@ -21,6 +21,30 @@ uint8_t seed[KYBER_SYMBYTES] = {0};
 #define  CALC(start, stop) \
   ((double) ((stop.tv_sec - start.tv_sec) * 1000000000 + (stop.tv_nsec - start.tv_nsec))) / NTESTS;
 
+
+static 
+void VectorVectorMul(poly *mp, polyvec *b, polyvec *skpv)
+{
+  neon_polyvec_ntt(b);
+  neon_polyvec_acc_montgomery(mp, skpv, b, 0);
+  neon_invntt(mp->coeffs);
+}
+
+static 
+void MatrixVectorMul(polyvec at[KYBER_K], polyvec *sp, polyvec *b)
+{
+  neon_polyvec_ntt(sp);
+  // matrix-vector multiplication
+  for(int i=0;i<KYBER_K;i++)
+    neon_polyvec_acc_montgomery(&b->vec[i], &at[i], sp, 0);
+
+  neon_polyvec_invntt_to_mont(b);
+}
+
+
+
+
+
 int main()
 {
   unsigned int i;
@@ -135,6 +159,26 @@ int main()
   TIME(stop);
   ns = CALC(start, stop);
   print("crypto_kem_dec:", ns);
+
+
+  TIME(start);
+  for(i=0;i<NTESTS;i++) {
+    VectorVectorMul(&ap, &sp, &b);
+  }
+  TIME(stop);
+  ns = CALC(start, stop);
+  print("VectorVectorMul", ns);
+
+  
+  TIME(start);
+  for(i=0;i<NTESTS;i++) {
+    MatrixVectorMul(matrix, &sp, &b);
+  }
+  TIME(stop);
+  ns = CALC(start, stop);
+  print("MatrixVectorMul", ns);
+
+
 
 
   return 0;
