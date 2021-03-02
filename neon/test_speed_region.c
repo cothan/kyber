@@ -58,6 +58,8 @@ int main()
   unsigned char msg[KYBER_INDCPA_MSGBYTES] = {0};
   polyvec matrix[KYBER_K];
   poly ap, bp;
+  polyvec sp, b;
+
   struct timespec start, stop;
   long ns;
 
