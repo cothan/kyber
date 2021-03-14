@@ -37,9 +37,12 @@ all: \
 #   test_vectors1024-90s
 
 speed: \
-  test_speed512 \
-  test_speed768 \
-  test_speed1024
+  test_speed512_macos \
+  test_speed768_macos \
+  test_speed1024_macos
+#   test_speed512 \
+#   test_speed768 \
+#   test_speed1024
 #   test_speed_ntt
 #   test_speed512-90s \
 #   test_speed768-90s \
@@ -110,6 +113,16 @@ test_speed768: $(SOURCESKECCAK) $(HEADERSKECCAK) test_speed_region.c randombytes
 
 test_speed1024: $(SOURCESKECCAK) $(HEADERSKECCAK) test_speed_region.c randombytes.c
 	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c test_speed_region.c $(LIBPAPI) -o test_speed1024
+
+test_speed512_macos: $(SOURCESKECCAK) $(HEADERSKECCAK) test_speed_region_macos.c randombytes.c
+	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c test_speed_region_macos.c $(LIBPAPI) -o test_speed512_macos
+
+test_speed768_macos: $(SOURCESKECCAK) $(HEADERSKECCAK) test_speed_region_macos.c randombytes.c
+	$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) randombytes.c test_speed_region_macos.c $(LIBPAPI) -o test_speed768_macos
+
+test_speed1024_macos: $(SOURCESKECCAK) $(HEADERSKECCAK) test_speed_region_macos.c randombytes.c
+	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c test_speed_region_macos.c $(LIBPAPI) -o test_speed1024_macos
+
 
 test_speed512keccak: $(SOURCESKECCAK) $(HEADERSKECCAK) speed_print.h speed_print.c test_speed_keccak.c randombytes.c
 	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c test_speed_keccak.c $(LIBPAPI) -o test_speed512keccak
@@ -200,6 +213,9 @@ clean:
 	-$(RM) -rf test_speed512
 	-$(RM) -rf test_speed768
 	-$(RM) -rf test_speed1024
+	-$(RM) -rf test_speed512_macos
+	-$(RM) -rf test_speed768_macos
+	-$(RM) -rf test_speed1024_macos
 	-$(RM) -rf test_kyber512-90s
 	-$(RM) -rf test_kyber768-90s
 	-$(RM) -rf test_kyber1024-90s
@@ -227,11 +243,9 @@ clean:
 	-$(RM) -rf test_speed_ntt
 
 bench:
-	sudo cpupower frequency-set --governor performance
-	./test_speed512 
-	./test_speed768
-	./test_speed1024
-	sudo cpupower frequency-set --governor powersave
+	./test_speed512_macos
+	./test_speed768_macos
+	./test_speed1024_macos
 	echo "DONE"
 
 bench_keccak:
