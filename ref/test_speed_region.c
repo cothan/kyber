@@ -44,6 +44,26 @@ void MatrixVectorMul(polyvec at[KYBER_K], polyvec *sp, polyvec *b)
   ((double) ((stop.tv_sec - start.tv_sec) * 1000000000 + (stop.tv_nsec - start.tv_nsec))) / NTESTS;
 
 
+static 
+void VectorVectorMul(poly *mp, polyvec *b, polyvec *skpv)
+{
+  polyvec_ntt(b);
+  polyvec_basemul_acc_montgomery(mp, skpv, b);
+  poly_invntt_tomont(mp);
+}
+
+static 
+void MatrixVectorMul(polyvec at[KYBER_K], polyvec *sp, polyvec *b)
+{
+  polyvec_ntt(sp);
+  // matrix-vector multiplication
+  for(int i=0;i<KYBER_K;i++)
+    polyvec_basemul_acc_montgomery(&b->vec[i], &at[i], sp);
+
+  polyvec_invntt_tomont(b);
+}
+
+
 uint8_t seed[KYBER_SYMBYTES] = {0};
 
 int main()
@@ -59,6 +79,9 @@ int main()
   unsigned char msg[KYBER_INDCPA_MSGBYTES] = {0};
   polyvec matrix[KYBER_K];
   poly ap;
+  polyvec sp, b;
+  // poly bp;
+
   struct timespec start, stop;
   long ns;
 
@@ -170,16 +193,19 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("VectorVectorMul:", ns)
+  print("VectorVectorMul", ns);
 
-
-  TIME(start);  
+  
+  TIME(start);
   for(i=0;i<NTESTS;i++) {
     MatrixVectorMul(matrix, &sp, &b);
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("MatrixVectorMul:", ns);
+  print("MatrixVectorMul", ns);
+
+
+
 
   /*
   PAPI_hl_region_begin("kex_uake_initA");
