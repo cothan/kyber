@@ -38,3 +38,9 @@ ref/test_speed1024keccak
 ref/PQCgenKAT_kem
 
 avx2/result.md
+neon/test_speed512_macos
+neon/test_speed768_macos
+neon/test_speed1024_macos
+ref/test_speed512_macos
+ref/test_speed768_macos
+ref/test_speed1024_macos
