@@ -115,14 +115,14 @@ test_speed768: $(SOURCESKECCAK) $(HEADERSKECCAK)  test_speed_region.c randombyte
 test_speed1024: $(SOURCESKECCAK) $(HEADERSKECCAK)  test_speed_region.c randombytes.c
 		$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c  test_speed_region.c $(LIBPAPI) -o test_speed1024
 
-test_speed512_macos: $(SOURCESKECCAK) $(HEADERSKECCAK)  test_speed_region_macos.c randombytes.c
-		$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c  test_speed_region_macos.c $(LIBPAPI) -o test_speed512_macos
+test_speed512_macos: $(SOURCESKECCAK) $(HEADERSKECCAK)  test_speed_region_macos.c randombytes.c m1cycles.c
+		$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) m1cycles.c randombytes.c  test_speed_region_macos.c $(LIBPAPI) -o test_speed512_macos
 
-test_speed768_macos: $(SOURCESKECCAK) $(HEADERSKECCAK)  test_speed_region_macos.c randombytes.c
-		$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) randombytes.c  test_speed_region_macos.c $(LIBPAPI) -o test_speed768_macos
+test_speed768_macos: $(SOURCESKECCAK) $(HEADERSKECCAK)  test_speed_region_macos.c randombytes.c m1cycles.c
+		$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) m1cycles.c randombytes.c  test_speed_region_macos.c $(LIBPAPI) -o test_speed768_macos
 
-test_speed1024_macos: $(SOURCESKECCAK) $(HEADERSKECCAK)  test_speed_region_macos.c randombytes.c
-		$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c  test_speed_region_macos.c $(LIBPAPI) -o test_speed1024_macos
+test_speed1024_macos: $(SOURCESKECCAK) $(HEADERSKECCAK)  test_speed_region_macos.c randombytes.c m1cycles.c
+		$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) m1cycles.c randombytes.c  test_speed_region_macos.c $(LIBPAPI) -o test_speed1024_macos
 
 test_speed512keccak: $(SOURCESKECCAK) $(HEADERSKECCAK)  test_speed_keccak.c randombytes.c
 		$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c  test_speed_keccak.c $(LIBPAPI) -o test_speed512keccak
