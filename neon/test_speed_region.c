@@ -9,7 +9,6 @@
 #include "poly.h"
 #include "polyvec.h"
 #include <time.h>
-#include "print.h"
 #include "neon_ntt.h"
 
 #define NTESTS 1000000
@@ -61,7 +60,7 @@ int main()
   polyvec sp, b;
 
   struct timespec start, stop;
-  long ns;
+  long long ns;
 
 
   TIME(start);
@@ -70,7 +69,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("gen_matrix:", ns);
+  printf("gen_matrix: %lld\n", ns);
 
 
   TIME(start);
@@ -79,7 +78,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("neon_poly_getnoise_eta1_2x:", ns);
+  printf("neon_poly_getnoise_eta1_2x: %lld\n", ns);
 
 
 
@@ -89,7 +88,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("neon_poly_getnoise_eta2:", ns);
+  printf("neon_poly_getnoise_eta2: %lld\n", ns);
 
 
 
@@ -99,7 +98,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("poly_tomsg:", ns);
+  printf("poly_tomsg: %lld\n", ns);
 
 
 
@@ -109,7 +108,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("poly_frommsg:", ns);
+  printf("poly_frommsg: %lld\n", ns);
 
 
 
@@ -120,7 +119,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("neon_ntt:", ns);
+  printf("neon_ntt: %lld\n", ns);
 
 
 
@@ -130,7 +129,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("neon_invntt:", ns);
+  printf("neon_invntt: %lld\n", ns);
 
 
 
@@ -140,7 +139,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("crypto_kem_keypair:", ns);
+  printf("crypto_kem_keypair: %lld\n", ns);
 
 
 
@@ -150,7 +149,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("crypto_kem_enc:", ns);
+  printf("crypto_kem_enc: %lld\n", ns);
 
 
 
@@ -160,7 +159,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("crypto_kem_dec:", ns);
+  printf("crypto_kem_dec: %lld\n", ns);
 
 
   TIME(start);
@@ -169,7 +168,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("VectorVectorMul", ns);
+  printf("VectorVectorMul %lld\n", ns);
 
   
   TIME(start);
@@ -178,7 +177,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("MatrixVectorMul", ns);
+  printf("MatrixVectorMul %lld\n", ns);
 
 
 
