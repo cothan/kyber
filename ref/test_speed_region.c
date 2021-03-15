@@ -8,15 +8,35 @@
 #include "indcpa.h"
 #include "poly.h"
 #include "polyvec.h"
-// #include "papi.h"
+#include "cpucycles.h"
 #include "ntt.h"
 #include <time.h>
-#include "print.h"
 
-// micro second 
+// micro second
 #define NTESTS 1000000
 
-uint64_t t[NTESTS];
+#define TIME(s) s = cpucycles();
+// Result is nanosecond per call
+#define CALC(start, stop) (stop - start) / NTESTS;
+
+static void VectorVectorMul(poly *mp, polyvec *b, polyvec *skpv)
+{
+  polyvec_ntt(b);
+  polyvec_basemul_acc_montgomery(mp, skpv, b);
+  poly_invntt_tomont(mp);
+}
+
+static void MatrixVectorMul(polyvec at[KYBER_K], polyvec *sp, polyvec *b)
+{
+  polyvec_ntt(sp);
+
+  // matrix-vector multiplication
+  for (int i = 0; i < KYBER_K; i++)
+    polyvec_basemul_acc_montgomery(&b->vec[i], &at[i], sp);
+
+  polyvec_invntt_tomont(b);
+}
+
 uint8_t seed[KYBER_SYMBYTES] = {0};
 
 int main()
@@ -32,136 +52,143 @@ int main()
   unsigned char msg[KYBER_INDCPA_MSGBYTES] = {0};
   polyvec matrix[KYBER_K];
   poly ap;
-  // poly bp;
-  clock_t start, end; 
+  polyvec b, sp;
 
-  // PAPI_hl_region_begin("gen_matrix");
-  start = clock();
-  for(i=0;i<NTESTS;i++) {
+  long long start, stop;
+  long long ns;
+
+  TIME(start);
+  for (i = 0; i < NTESTS; i++)
+  {
     gen_matrix(matrix, seed, 0);
   }
-  end =  clock() - start;
-  print("gen_matrix:", ((double) end)/CLOCKS_PER_SEC);
-  // PAPI_hl_region_end("gen_matrix");
+  TIME(stop);
+  ns = CALC(start, stop);
+  printf("gen_matrix: %lld\n", ns);
 
-  // PAPI_hl_region_begin("poly_getnoise_eta1");
-  start = clock();
-  for(i=0;i<NTESTS;i++) {
+  TIME(start);
+  for (i = 0; i < NTESTS; i++)
+  {
     poly_getnoise_eta1(&ap, seed, 1);
   }
-  end =  clock() - start;
-  print("poly_getnoise_eta1:", ((double) end)/CLOCKS_PER_SEC);
-  // PAPI_hl_region_end("poly_getnoise_eta1");
+  TIME(stop);
+  ns = CALC(start, stop);
+  printf("poly_getnoise_eta1: %lld\n", ns);
 
-  // PAPI_hl_region_begin("poly_getnoise_eta2");
-  start = clock();
-  for(i=0;i<NTESTS;i++) {
+  TIME(start);
+  for (i = 0; i < NTESTS; i++)
+  {
     poly_getnoise_eta2(&ap, seed, 0);
   }
-  end =  clock() - start;
-  print("poly_getnoise_eta2:", ((double) end)/CLOCKS_PER_SEC);
-  // PAPI_hl_region_end("poly_getnoise_eta2");
+  TIME(stop);
+  ns = CALC(start, stop);
+  printf("poly_getnoise_eta2: %lld\n", ns);
 
-  // PAPI_hl_region_begin("poly_tomsg");
-  start = clock();
-  for(i=0;i<NTESTS;i++) {
+  TIME(start);
+  for (i = 0; i < NTESTS; i++)
+  {
     poly_tomsg(msg, &ap);
   }
-  end =  clock() - start;
-  print("poly_tomsg:", ((double) end)/CLOCKS_PER_SEC);
-  // PAPI_hl_region_end("poly_tomsg");
+  TIME(stop);
+  ns = CALC(start, stop);
+  printf("poly_tomsg: %lld\n", ns);
 
-  // PAPI_hl_region_begin("poly_frommsg");
-  start = clock();
-  for(i=0;i<NTESTS;i++) {
+  TIME(start);
+  for (i = 0; i < NTESTS; i++)
+  {
     poly_frommsg(&ap, msg);
   }
-  end =  clock() - start;
-  print("poly_frommsg:", ((double) end)/CLOCKS_PER_SEC);
-  // PAPI_hl_region_end("poly_frommsg");
+  TIME(stop);
+  ns = CALC(start, stop);
+  printf("poly_frommsg: %lld\n", ns);
 
-
-  // PAPI_hl_region_begin("ref_ntt");
-  start = clock();
-  for(i=0;i<NTESTS;i++) {
+  TIME(start);
+  for (i = 0; i < NTESTS; i++)
+  {
     ntt(ap.coeffs);
   }
-  end =  clock() - start;
-  print("ref_ntt:", ((double) end)/CLOCKS_PER_SEC);
-  // PAPI_hl_region_end("ref_ntt");
+  TIME(stop);
+  ns = CALC(start, stop);
+  printf("ref_ntt: %lld\n", ns);
 
-  // PAPI_hl_region_begin("ref_invntt");
-  start = clock();
-  for(i=0;i<NTESTS;i++) {
+  TIME(start);
+  for (i = 0; i < NTESTS; i++)
+  {
     invntt(ap.coeffs);
   }
-  end =  clock() - start;
-  print("ref_invntt:", ((double) end)/CLOCKS_PER_SEC);
-  // PAPI_hl_region_end("ref_invntt");
+  TIME(stop);
+  ns = CALC(start, stop);
+  printf("ref_invntt: %lld\n", ns);
 
-  // PAPI_hl_region_begin("crypto_kem_keypair");
-  start = clock();
-  for(i=0;i<NTESTS;i++) {
+  TIME(start);
+  for (i = 0; i < NTESTS; i++)
+  {
     crypto_kem_keypair(pk, sk);
   }
-  end =  clock() - start;
-  print("crypto_kem_keypair:", ((double) end)/CLOCKS_PER_SEC);
-  // PAPI_hl_region_end("crypto_kem_keypair");
+  TIME(stop);
+  ns = CALC(start, stop);
+  printf("crypto_kem_keypair: %lld\n", ns);
 
-  // PAPI_hl_region_begin("crypto_kem_enc");
-  start = clock();
-  for(i=0;i<NTESTS;i++) {
+  TIME(start);
+  for (i = 0; i < NTESTS; i++)
+  {
     crypto_kem_enc(ct, key, pk);
   }
-  end =  clock() - start;
-  print("crypto_kem_enc:", ((double) end)/CLOCKS_PER_SEC);
-  // PAPI_hl_region_end("crypto_kem_enc");
+  TIME(stop);
+  ns = CALC(start, stop);
+  printf("crypto_kem_enc: %lld\n", ns);
 
-  // PAPI_hl_region_begin("crypto_kem_dec");
-  start = clock();
-  for(i=0;i<NTESTS;i++) {
+  TIME(start);
+  for (i = 0; i < NTESTS; i++)
+  {
     crypto_kem_dec(key, ct, sk);
   }
-  end =  clock() - start;
-  print("crypto_kem_dec:", ((double) end)/CLOCKS_PER_SEC);
-  // PAPI_hl_region_end("crypto_kem_dec");
+  TIME(stop);
+  ns = CALC(start, stop);
+  printf("crypto_kem_dec: %lld\n", ns);
+
+  TIME(start);
+  for(i=0;i<NTESTS;i++) {
+    VectorVectorMul(&ap, &sp, &b);
+  }
+  TIME(stop);
+  ns = CALC(start, stop);
+  printf("VectorVectorMul: %lld\n", ns);
+
+  
+  TIME(start);
+  for(i=0;i<NTESTS;i++) {
+    MatrixVectorMul(matrix, &sp, &b);
+  }
+  TIME(stop);
+  ns = CALC(start, stop);
+  printf("MatrixVectorMul: %lld\n", ns);
+
 
   /*
-  PAPI_hl_region_begin("kex_uake_initA");
   for(i=0;i<NTESTS;i++) {
     kex_uake_initA(kexsenda, key, sk, pk);
   }
-  PAPI_hl_region_end("kex_uake_initA");
 
-  PAPI_hl_region_begin("kex_uake_sharedB");
   for(i=0;i<NTESTS;i++) {
     kex_uake_sharedB(kexsendb, kexkey, kexsenda, sk);
   }
-  PAPI_hl_region_end("kex_uake_sharedB");
 
-  PAPI_hl_region_begin("kex_uake_sharedA");
   for(i=0;i<NTESTS;i++) {
     kex_uake_sharedA(kexkey, kexsendb, key, sk);
   }
-  PAPI_hl_region_end("kex_uake_sharedA");
 
-  PAPI_hl_region_begin("kex_ake_initA");
   for(i=0;i<NTESTS;i++) {
     kex_ake_initA(kexsenda, key, sk, pk);
   }
-  PAPI_hl_region_end("kex_ake_initA");
 
-  PAPI_hl_region_begin("kex_ake_sharedB");
   for(i=0;i<NTESTS;i++) {
     kex_ake_sharedB(kexsendb, kexkey, kexsenda, sk, pk);
   }
-  PAPI_hl_region_end("kex_ake_sharedB");
 
-  PAPI_hl_region_begin("kex_ake_sharedA");
   for(i=0;i<NTESTS;i++) {
     kex_ake_sharedA(kexkey, kexsendb, key, sk, sk);
   }
-  PAPI_hl_region_end("kex_ake_sharedA");
   */
   return 0;
 }

@@ -1,0 +1,69 @@
+sudo cpupower frequency-set --governor performance
+[sudo] password for cothan: 
+Setting cpu: 0
+Setting cpu: 1
+Setting cpu: 2
+Setting cpu: 3
+Setting cpu: 4
+Setting cpu: 5
+Setting cpu: 6
+Setting cpu: 7
+Setting cpu: 8
+Setting cpu: 9
+Setting cpu: 10
+Setting cpu: 11
+./test_speed512 
+gen_matrix: 15235
+poly_getnoise_eta1: 2661
+poly_getnoise_eta2: 1723
+poly_tomsg: 679
+poly_frommsg: 97
+ref_ntt: 3952
+ref_invntt: 6804
+crypto_kem_keypair: 77977
+crypto_kem_enc: 95659
+crypto_kem_dec: 114528
+VectorVectorMul: 22439
+MatrixVectorMul: 34248
+./test_speed768
+gen_matrix: 33965
+poly_getnoise_eta1: 1729
+poly_getnoise_eta2: 1721
+poly_tomsg: 711
+poly_frommsg: 97
+ref_ntt: 3926
+ref_invntt: 7050
+crypto_kem_keypair: 130718
+crypto_kem_enc: 153115
+crypto_kem_dec: 173442
+VectorVectorMul: 29267
+MatrixVectorMul: 59626
+./test_speed1024
+gen_matrix: 72210
+poly_getnoise_eta1: 1729
+poly_getnoise_eta2: 1765
+poly_tomsg: 701
+poly_frommsg: 97
+ref_ntt: 3975
+ref_invntt: 7196
+crypto_kem_keypair: 207325
+crypto_kem_enc: 225236
+crypto_kem_dec: 253718
+VectorVectorMul: 37573
+MatrixVectorMul: 91337
+sudo cpupower frequency-set --governor powersave
+[sudo] password for cothan: 
+Setting cpu: 0
+Setting cpu: 1
+Setting cpu: 2
+Setting cpu: 3
+Setting cpu: 4
+Setting cpu: 5
+Setting cpu: 6
+Setting cpu: 7
+Setting cpu: 8
+Setting cpu: 9
+Setting cpu: 10
+Setting cpu: 11
+echo "DONE"	
+DONE

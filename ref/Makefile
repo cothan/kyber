@@ -104,13 +104,13 @@ test_vectors1024: $(SOURCESKECCAK) $(HEADERSKECCAK) test_vectors.c
 		$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) test_vectors.c -o test_vectors1024
 
 test_speed512: $(SOURCESKECCAK) $(HEADERSKECCAK)  test_speed_region.c randombytes.c
-		$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c  test_speed_region.c $(LIBPAPI) -o test_speed512
+		$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) cpucycles.c randombytes.c  test_speed_region.c $(LIBPAPI) -o test_speed512
 
 test_speed768: $(SOURCESKECCAK) $(HEADERSKECCAK)  test_speed_region.c randombytes.c
-		$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) randombytes.c  test_speed_region.c $(LIBPAPI) -o test_speed768
+		$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) cpucycles.c randombytes.c  test_speed_region.c $(LIBPAPI) -o test_speed768
 
 test_speed1024: $(SOURCESKECCAK) $(HEADERSKECCAK)  test_speed_region.c randombytes.c
-		$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c  test_speed_region.c $(LIBPAPI) -o test_speed1024
+		$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) cpucycles.c randombytes.c  test_speed_region.c $(LIBPAPI) -o test_speed1024
 
 test_speed512keccak: $(SOURCESKECCAK) $(HEADERSKECCAK)  test_speed_keccak.c randombytes.c
 		$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c  test_speed_keccak.c $(LIBPAPI) -o test_speed512keccak
@@ -222,7 +222,9 @@ clean:
 
 
 bench:
-	./test_speed512
+	sudo cpupower frequency-set --governor performance
+	./test_speed512 
 	./test_speed768
 	./test_speed1024
-	./test_speed_ntt
+	sudo cpupower frequency-set --governor powersave
+	echo "DONE"	
