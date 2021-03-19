@@ -8,10 +8,9 @@
 #include "indcpa.h"
 #include "poly.h"
 #include "polyvec.h"
-// #include "papi.h"
+#include "cpucycles.h"
 #include "ntt.h"
 #include <time.h>
-#include "print.h"
 
 
 static 
@@ -62,7 +61,6 @@ void MatrixVectorMul(polyvec at[KYBER_K], polyvec *sp, polyvec *b)
 
   polyvec_invntt_tomont(b);
 }
-
 
 uint8_t seed[KYBER_SYMBYTES] = {0};
 

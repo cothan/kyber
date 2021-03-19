@@ -11,8 +11,6 @@
 #include "randombytes.h"
 #include "cpucycles.h"
 #include "speed_print.h"
-#include <time.h>
-#include "print.h"
 
 #define NTESTS 1000000
 
@@ -24,10 +22,32 @@ void randombytes(__attribute__((unused)) uint8_t *r, __attribute__((unused)) siz
   return;
 }
 
-#define TIME(s) clock_gettime(CLOCK_MONOTONIC_RAW, &s);
+#define TIME(s) s = cpucycles();
 // Result is nanosecond per call 
-#define  CALC(start, stop) \
-  ((double) ((stop.tv_sec - start.tv_sec) * 1000000000 + (stop.tv_nsec - start.tv_nsec))) / NTESTS;
+#define  CALC(start, stop) (stop - start)/NTESTS;
+
+
+static 
+void VectorVectorMul(poly *mp, polyvec *b, polyvec *skpv)
+{
+  polyvec_ntt(b);
+  polyvec_basemul_acc_montgomery(mp, skpv, b);
+  poly_invntt_tomont(mp);
+}
+
+
+static 
+void MatrixVectorMul(polyvec at[KYBER_K], polyvec *sp, polyvec *b)
+{
+  polyvec_ntt(sp);
+
+  // matrix-vector multiplication
+  for(int i=0;i<KYBER_K;i++)
+    polyvec_basemul_acc_montgomery(&b->vec[i], &at[i], sp);
+
+  polyvec_invntt_tomont(b);
+}
+
 
 
 int main()
@@ -42,8 +62,9 @@ int main()
   uint8_t kexkey[KEX_SSBYTES];
   polyvec matrix[KYBER_K];
   poly ap;
-  struct timespec start, stop;
-  long ns;
+  polyvec sp, b;
+  long long start, stop;
+  long long ns;
 
 #ifndef KYBER_90S
   poly bp, cp, dp;
@@ -55,7 +76,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("gen_matrix:", ns);
+  printf("gen_matrix: %lld\n", ns);
 
 
   TIME(start);
@@ -64,7 +85,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("poly_getnoise_eta1:", ns);
+  printf("poly_getnoise_eta1: %lld\n", ns);
 
   TIME(start);
   for(i=0;i<NTESTS;i++) {
@@ -72,7 +93,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("poly_getnoise_eta2:", ns);
+  printf("poly_getnoise_eta2: %lld\n", ns);
 
 #ifndef KYBER_90S
   TIME(start);
@@ -81,7 +102,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("poly_getnoise_eta1_4x:", ns);
+  printf("poly_getnoise_eta1_4x: %lld\n", ns);
 #endif
 
   TIME(start);
@@ -90,7 +111,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("poly_ntt:", ns);
+  printf("poly_ntt: %lld\n", ns);
 
   TIME(start);
   for(i=0;i<NTESTS;i++) {
@@ -98,7 +119,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("poly_invntt_tomont:", ns);
+  printf("poly_invntt_tomont: %lld\n", ns);
 
   TIME(start);
   for(i=0;i<NTESTS;i++) {
@@ -106,7 +127,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("polyvec_basemul_acc_montgomery:", ns);
+  printf("polyvec_basemul_acc_montgomery: %lld\n", ns);
 
   TIME(start);
   for(i=0;i<NTESTS;i++) {
@@ -114,7 +135,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("poly_tomsg:", ns);
+  printf("poly_tomsg: %lld\n", ns);
   
   TIME(start);
   for(i=0;i<NTESTS;i++) {
@@ -122,7 +143,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("poly_frommsg:", ns);
+  printf("poly_frommsg: %lld\n", ns);
 
   TIME(start);
   for(i=0;i<NTESTS;i++) {
@@ -130,7 +151,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("poly_compress:", ns);
+  printf("poly_compress: %lld\n", ns);
   
   TIME(start);
   for(i=0;i<NTESTS;i++) {
@@ -138,7 +159,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("poly_decompress:", ns);
+  printf("poly_decompress: %lld\n", ns);
 
   TIME(start);
   for(i=0;i<NTESTS;i++) {
@@ -146,7 +167,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("polyvec_compress:", ns);
+  printf("polyvec_compress: %lld\n", ns);
 
   TIME(start);
   for(i=0;i<NTESTS;i++) {
@@ -154,7 +175,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("polyvec_decompress:", ns);
+  printf("polyvec_decompress: %lld\n", ns);
 
   TIME(start);
   for(i=0;i<NTESTS;i++) {
@@ -162,7 +183,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("indcpa_keypair:", ns);
+  printf("indcpa_keypair: %lld\n", ns);
   
   TIME(start);
   for(i=0;i<NTESTS;i++) {
@@ -170,7 +191,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("indcpa_enc:", ns);
+  printf("indcpa_enc: %lld\n", ns);
 
   TIME(start);
   for(i=0;i<NTESTS;i++) {
@@ -178,7 +199,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("indcpa_dec:", ns);
+  printf("indcpa_dec: %lld\n", ns);
 
   TIME(start);
   for(i=0;i<NTESTS;i++) {
@@ -186,7 +207,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("crypto_kem_keypair:", ns);
+  printf("crypto_kem_keypair: %lld\n", ns);
   
   TIME(start);
   for(i=0;i<NTESTS;i++) {
@@ -194,7 +215,7 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("crypto_kem_enc:", ns);
+  printf("crypto_kem_enc: %lld\n", ns);
   
   TIME(start);
   for(i=0;i<NTESTS;i++) {
@@ -202,8 +223,25 @@ int main()
   }
   TIME(stop);
   ns = CALC(start, stop);
-  print("crypto_kem_dec:", ns);
+  printf("crypto_kem_dec: %lld\n", ns);
+
+  TIME(start);
+  for(i=0;i<NTESTS;i++) {
+    VectorVectorMul(&ap, &sp, &b);
+  }
+  TIME(stop);
+  ns = CALC(start, stop);
+  printf("VectorVectorMul: %lld\n", ns);
+
   
+  TIME(start);
+  for(i=0;i<NTESTS;i++) {
+    MatrixVectorMul(matrix, &sp, &b);
+  }
+  TIME(stop);
+  ns = CALC(start, stop);
+  printf("MatrixVectorMul: %lld\n", ns);
+
 /* 
   for(i=0;i<NTESTS;i++) {
     t[i] = cpucycles();

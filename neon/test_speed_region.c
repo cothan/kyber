@@ -8,17 +8,16 @@
 #include "indcpa.h"
 #include "poly.h"
 #include "polyvec.h"
-#include <time.h>
 #include "neon_ntt.h"
+#include "cpucycles.h"
 
 #define NTESTS 1000000
 
 uint8_t seed[KYBER_SYMBYTES] = {0};
 
-#define TIME(s) clock_gettime(CLOCK_MONOTONIC_RAW, &s);
+#define TIME(s) s = cpucycles();
 // Result is nanosecond per call 
-#define  CALC(start, stop) \
-  ((double) ((stop.tv_sec - start.tv_sec) * 1000000000 + (stop.tv_nsec - start.tv_nsec))) / NTESTS;
+#define  CALC(start, stop) (stop - start)/NTESTS;
 
 
 static 
@@ -59,7 +58,7 @@ int main()
   poly ap, bp;
   polyvec sp, b;
 
-  struct timespec start, stop;
+  long long start, stop;
   long long ns;
 
 
