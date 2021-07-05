@@ -44,3 +44,5 @@ neon/test_speed1024_macos
 ref/test_speed512_macos
 ref/test_speed768_macos
 ref/test_speed1024_macos
+neon/test_new
+neon/gen_ntt_qinv
