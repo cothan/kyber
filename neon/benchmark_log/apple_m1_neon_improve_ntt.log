@@ -1,0 +1,39 @@
+./test_speed512_macos
+gen_matrix: 7677
+neon_poly_getnoise_eta1_2x: 2698
+neon_poly_getnoise_eta2: 1293
+poly_tomsg: 296
+poly_frommsg: 100
+neon_ntt: 240
+neon_invntt: 254
+crypto_kem_keypair: 21689
+crypto_kem_enc: 30945
+crypto_kem_dec: 27047
+VectorVectorMul 1105
+MatrixVectorMul 1673
+./test_speed768_macos
+gen_matrix: 17934
+neon_poly_getnoise_eta1_2x: 1292
+neon_poly_getnoise_eta2: 1293
+poly_tomsg: 296
+poly_frommsg: 100
+neon_ntt: 240
+neon_invntt: 254
+crypto_kem_keypair: 34138
+crypto_kem_enc: 46691
+crypto_kem_dec: 41589
+VectorVectorMul 1512
+MatrixVectorMul 2922
+./test_speed1024_macos
+gen_matrix: 30729
+neon_poly_getnoise_eta1_2x: 1293
+neon_poly_getnoise_eta2: 1296
+poly_tomsg: 296
+poly_frommsg: 100
+neon_ntt: 240
+neon_invntt: 254
+crypto_kem_keypair: 52363
+crypto_kem_enc: 68252
+crypto_kem_dec: 63528
+VectorVectorMul 1922
+MatrixVectorMul 4461
