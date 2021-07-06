@@ -114,13 +114,12 @@ t32_1, t32_2: int32x4_t
 t16: int16x8_t 
 neon_v, neon_kyber16
 */
-#define barrett(inout, t, i)                                                  \
-  t.val[i] = (int16x8_t)vmull_s16(vget_low_s16(inout), vget_low_s16(neon_v)); \
-  t.val[i + 1] = (int16x8_t)vmull_high_s16(inout, neon_v);                    \
-  t.val[i] = vuzp2q_s16(t.val[i], t.val[i + 1]);                              \
-  t.val[i + 1] = vaddq_s16(t.val[i], neon_one);                               \
-  t.val[i + 1] = vshrq_n_s16(t.val[i + 1], 10);                               \
+#define barrett(inout, t, i)                                        \
+  t.val[i] = vqdmulhq_s16(inout, neon_v);        /* (2*a*v)_H */    \
+  t.val[i + 1] = vhaddq_s16(t.val[i], neon_one); /* (2a*v + 2)/2 */ \
+  t.val[i + 1] = vshrq_n_s16(t.val[i + 1], 10);                     \
   inout = vmlsq_s16(inout, t.val[i + 1], neon_kyberq);
+
 /*************************************************
 * Name:        poly_reduce
 *
