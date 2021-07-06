@@ -13,35 +13,27 @@
 
 #define NTESTS 1000000
 
+#define BEGIN(funcname) PAPI_hl_region_begin(funcname);
+#define END(funcname) PAPI_hl_region_end(funcname);
+
 uint8_t seed[KYBER_SYMBYTES] = {0};
 
-#define TIME(s) s = cpucycles();
-// Result is nanosecond per call 
-#define  CALC(start, stop) (stop - start)/NTESTS;
-
-
-static 
-void VectorVectorMul(poly *mp, polyvec *b, polyvec *skpv)
+static void VectorVectorMul(poly *mp, polyvec *b, polyvec *skpv)
 {
   neon_polyvec_ntt(b);
   neon_polyvec_acc_montgomery(mp, skpv, b, 0);
   neon_invntt(mp->coeffs);
 }
 
-static 
-void MatrixVectorMul(polyvec at[KYBER_K], polyvec *sp, polyvec *b)
+static void MatrixVectorMul(polyvec at[KYBER_K], polyvec *sp, polyvec *b)
 {
   neon_polyvec_ntt(sp);
   // matrix-vector multiplication
-  for(int i=0;i<KYBER_K;i++)
+  for (int i = 0; i < KYBER_K; i++)
     neon_polyvec_acc_montgomery(&b->vec[i], &at[i], sp, 0);
 
   neon_polyvec_invntt_to_mont(b);
 }
-
-
-
-
 
 int main()
 {
@@ -55,131 +47,118 @@ int main()
   unsigned char kexkey[KEX_SSBYTES] = {0};
   unsigned char msg[KYBER_INDCPA_MSGBYTES] = {0};
   polyvec matrix[KYBER_K];
+  polyvec sp, b;
   poly ap, bp;
   polyvec sp, b;
 
   long long start, stop;
   long long ns;
 
-
-  TIME(start);
-  for(i=0;i<NTESTS;i++) {
+  START("gen_matrix");
+  for (i = 0; i < NTESTS; i++)
+  {
     gen_matrix(matrix, seed, 0);
   }
-  TIME(stop);
-  ns = CALC(start, stop);
-  printf("gen_matrix: %lld\n", ns);
+  END("gen_matrix");
 
-
-  TIME(start);
-  for(i=0;i<NTESTS;i++) {
+  START("neon_poly_getnoise_eta1_2x");
+  for (i = 0; i < NTESTS; i++)
+  {
     neon_poly_getnoise_eta1_2x(&ap, &bp, seed, 0, 1);
   }
-  TIME(stop);
-  ns = CALC(start, stop);
-  printf("neon_poly_getnoise_eta1_2x: %lld\n", ns);
+  END("neon_poly_getnoise_eta1_2x");
 
-
-
-  TIME(start);
-  for(i=0;i<NTESTS;i++) {
+  START("neon_poly_getnoise_eta2");
+  for (i = 0; i < NTESTS; i++)
+  {
     neon_poly_getnoise_eta2(&ap, seed, 0);
   }
-  TIME(stop);
-  ns = CALC(start, stop);
-  printf("neon_poly_getnoise_eta2: %lld\n", ns);
+  END("neon_poly_getnoise_eta2");
 
-
-
-  TIME(start);
-  for(i=0;i<NTESTS;i++) {
+  START("poly_tomsg");
+  for (i = 0; i < NTESTS; i++)
+  {
     poly_tomsg(msg, &ap);
   }
-  TIME(stop);
-  ns = CALC(start, stop);
-  printf("poly_tomsg: %lld\n", ns);
+  END("poly_tomsg");
 
-
-
-  TIME(start); 
-  for(i=0;i<NTESTS;i++) {
+  START("poly_frommsg");
+  for (i = 0; i < NTESTS; i++)
+  {
     poly_frommsg(&ap, msg);
   }
-  TIME(stop);
-  ns = CALC(start, stop);
-  printf("poly_frommsg: %lld\n", ns);
+  END("poly_frommsg");
 
-
-
-
-  TIME(start);
-  for(i=0;i<NTESTS;i++) {
+  START("neon_ntt");
+  for (i = 0; i < NTESTS; i++)
+  {
     neon_ntt(ap.coeffs);
   }
-  TIME(stop);
-  ns = CALC(start, stop);
-  printf("neon_ntt: %lld\n", ns);
+  END("neon_ntt");
 
-
-
-  TIME(start);
-  for(i=0;i<NTESTS;i++) {
+  START("neon_invntt");
+  for (i = 0; i < NTESTS; i++)
+  {
     neon_invntt(ap.coeffs);
   }
-  TIME(stop);
-  ns = CALC(start, stop);
-  printf("neon_invntt: %lld\n", ns);
+  END("neon_invntt");
 
-
-
-  TIME(start);
-  for(i=0;i<NTESTS;i++) {
+  START("crypto_kem_keypair");
+  for (i = 0; i < NTESTS; i++)
+  {
     crypto_kem_keypair(pk, sk);
   }
-  TIME(stop);
-  ns = CALC(start, stop);
-  printf("crypto_kem_keypair: %lld\n", ns);
+  END("crypto_kem_keypair");
 
-
-
-  TIME(start); 
-  for(i=0;i<NTESTS;i++) {
+  START("crypto_kem_enc");
+  for (i = 0; i < NTESTS; i++)
+  {
     crypto_kem_enc(ct, key, pk);
   }
-  TIME(stop);
-  ns = CALC(start, stop);
-  printf("crypto_kem_enc: %lld\n", ns);
+  END("crypto_kem_enc");
 
-
-
-  TIME(start); 
-  for(i=0;i<NTESTS;i++) {
+  START("crypto_kem_dec");
+  for (i = 0; i < NTESTS; i++)
+  {
     crypto_kem_dec(key, ct, sk);
   }
-  TIME(stop);
-  ns = CALC(start, stop);
-  printf("crypto_kem_dec: %lld\n", ns);
+  END("crypto_kem_dec");
 
-
-  TIME(start);
-  for(i=0;i<NTESTS;i++) {
+  START("VectorVectorMul");
+  for (i = 0; i < NTESTS; i++)
+  {
     VectorVectorMul(&ap, &sp, &b);
   }
-  TIME(stop);
-  ns = CALC(start, stop);
-  printf("VectorVectorMul %lld\n", ns);
+  END("VectorVectorMul");
 
-  
-  TIME(start);
-  for(i=0;i<NTESTS;i++) {
+  START("MatrixVectorMul");
+  for (i = 0; i < NTESTS; i++)
+  {
     MatrixVectorMul(matrix, &sp, &b);
   }
-  TIME(stop);
-  ns = CALC(start, stop);
-  printf("MatrixVectorMul %lld\n", ns);
+  END("MatrixVectorMul");
 
+  /*
+  START("kex_uake_initA");
+  for(i=0;i<NTESTS;i++) {
+    kex_uake_initA(kexsenda, key, sk, pk);
+  }
+  END("kex_uake_initA");
+  */
 
+  START("VectorVectorMul");
+  for (i = 0; i < NTESTS; i++)
+  {
+    VectorVectorMul(&ap, &sp, &b);
+  }
+  END("VectorVectorMul");
 
+  START("MatrixVectorMul");
+  for (i = 0; i < NTESTS; i++)
+  {
+    MatrixVectorMul(matrix, &sp, &b);
+  }
+  END("MatrixVectorMul");
 
   return 0;
 }
