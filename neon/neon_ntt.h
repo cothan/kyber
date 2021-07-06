@@ -10,6 +10,13 @@ extern const int16_t neon_zetas_inv[272];
 #define neon_zetas KYBER_NAMESPACE(neon_zetas)
 extern const int16_t neon_zetas[224];
 
+#define neon_zetas_inv_qinv KYBER_NAMESPACE(neon_zetas_inv_qinv)
+extern const int16_t neon_zetas_inv_qinv[272];
+
+#define neon_zetas_qinv KYBER_NAMESPACE(neon_zetas_qinv)
+extern const int16_t neon_zetas_qinv[224];
+
+
 #define neon_ntt KYBER_NAMESPACE(neon_ntt)
 void neon_ntt(int16_t poly[256]);
 
