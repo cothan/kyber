@@ -5,8 +5,6 @@
 #include "poly.h"
 #include "polyvec.h"
 
-#define _V (((1U << 26) + KYBER_Q / 2) / KYBER_Q)
-
 /*************************************************
 * Name:        neon_polyvec_ntt
 *
@@ -92,59 +90,43 @@ rewrite pseudo code:
 int16_t fqmul(int16_t b, int16_t c) {
   int32_t t, u, a;
 
-  a = (int32_t) b*c;
-  (a_L, a_H) = a
-  a_L = a_L * QINV;
-  t = a_L * Q;
-  (t_L, t_H) = t;
-  return t_H - a_H;
-}
+  // fqmul: 4 MUL
+  t0 = a_H = (2*b*c)_H; 
+  t1 = a_L = (b * c)_L; 
+  t2 = (a_L * QINV)_L; 
+  t3 = (t2 * Q)_H;
+  out = (t0 - t3)/2
+
+  // fqmul_qinv: 3 MUL + precomputed
+  t0 = a_H = (2*b*c)_H; 
+  t1 = a_L = (b_qinv * c)_L; 
+  t2 = (t1 * Q)_H; 
+  out = (t0 - t2)/2 = (b*c)_H - (a_L * Q)_H;
+
 *************************************************/
-#define fqmul(out, in, zeta, t)                                                                              \
-  t.val[0] = (int16x8_t)vmull_s16(vget_low_s16(in), vget_low_s16(zeta));                                     \
-  t.val[1] = (int16x8_t)vmull_high_s16(in, zeta);                                                            \
-  t.val[2] = vuzp1q_s16(t.val[0], t.val[1]);                                          /* a_L  */             \
-  t.val[3] = vuzp2q_s16(t.val[0], t.val[1]);                                          /* a_H  */             \
-  t.val[0] = vmulq_s16(t.val[2], neon_qinv);                                          /* a_L = a_L * QINV */ \
-  t.val[1] = (int16x8_t)vmull_s16(vget_low_s16(t.val[0]), vget_low_s16(neon_kyberq)); /* t_L = a_L * Q */    \
-  t.val[2] = (int16x8_t)vmull_high_s16(t.val[0], neon_kyberq);                        /* t_H = a_L * Q*/     \
-  t.val[0] = vuzp2q_s16(t.val[1], t.val[2]);                                          /* t_H */              \
-  out = vsubq_s16(t.val[3], t.val[0]);                                                /* t_H - a_H */
+#define fqmul_qinv(out, in, zeta, zeta_qinv, t)                     \
+  t.val[0] = vqdmulhq_s16(in, zeta);              /* a_H */         \
+  t.val[1] = vmulq_s16(zeta_qinv, in);            /* a_L */         \
+  t.val[2] = vqdmulhq_s16(t.val[1], neon_kyberq); /* (2*a_L*Q)_H */ \
+  out = vhsubq_s16(t.val[0], t.val[2]);           /* (t0 - t2)/2 */
+
+#define fqmul(out, in, zeta, t)                                      \
+  t.val[0] = vqdmulhq_s16(in, zeta);              /* a_H */          \
+  t.val[1] = vmulq_s16(in, zeta);                 /* a_L */          \
+  t.val[2] = vmulq_s16(t.val[1], neon_qinv);      /* (a_L*QINV)_L */ \
+  t.val[3] = vqdmulhq_s16(t.val[2], neon_kyberq); /* (2*t2*Q)_H */   \
+  out = vhsubq_s16(t.val[0], t.val[3]);           /* (t0 - t3)/2 */
 
 /*
-inout: int16x4_t
-t32 : int32x4_t
-t16: int16x4_t
-neon_v: int16x4_t
-neon_kyberq16: inout int16x4_t
-
-int16_t barrett_reduce(int16_t a) {
-  int16_t t;
-  const int16_t v = ((1U << 26) + KYBER_Q / 2) / KYBER_Q;
-
-  t = (int32_t)v * a;
-  (t_L, t_H) = t; 
-  t_h = t_H + (1 << 9);
-  t_H = t_H >> 10;
-  t_H = a - t_H * KYBER_Q;
-  return t_H;
-}
-*/
-
-/*
-reduce low and high of 
 inout: 
 int16x8_t inout, 
-t32_1, t32_2: int32x4_t 
-t16: int16x8_t 
-neon_v, neon_kyber16
+int16x8x2_t t, 
+int16x8_t neon_v, neon_one, neon_kyberq;
 */
-#define barrett(inout, t, i)                                                  \
-  t.val[i] = (int16x8_t)vmull_s16(vget_low_s16(inout), vget_low_s16(neon_v)); \
-  t.val[i + 1] = (int16x8_t)vmull_high_s16(inout, neon_v);                    \
-  t.val[i] = vuzp2q_s16(t.val[i], t.val[i + 1]);                              \
-  t.val[i + 1] = vaddq_s16(t.val[i], neon_one);                               \
-  t.val[i + 1] = vshrq_n_s16(t.val[i + 1], 10);                               \
+#define barrett(inout, t, i)                                        \
+  t.val[i] = vqdmulhq_s16(inout, neon_v);        /* (2*a*v)_H */    \
+  t.val[i + 1] = vhaddq_s16(t.val[i], neon_one); /* (2a*v + 2)/2 */ \
+  t.val[i + 1] = vshrq_n_s16(t.val[i + 1], 10);                     \
   inout = vmlsq_s16(inout, t.val[i + 1], neon_kyberq);
 
 /*************************************************
@@ -159,13 +141,14 @@ neon_v, neon_kyber16
 **************************************************/
 void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, const int to_mont)
 {
-  int16x8x4_t aa, bb, r, ta, tb, t;                              // 24
-  int16x8_t neon_v, neon_qinv, neon_kyberq, neon_zeta, neon_one; // 5
+  int16x8x4_t aa, bb, r, ta, tb, t; // 24
+  int16x8_t neon_v, neon_qinv, neon_kyberq,
+            neon_zeta, neon_one, neon_zeta_qinv; // 6
 
   // Declare constant
   neon_qinv = vdupq_n_s16(QINV);
   neon_kyberq = vdupq_n_s16(KYBER_Q);
-  neon_v = vdupq_n_s16(_V);
+  neon_v = vdupq_n_s16((((1U << 26) + KYBER_Q / 2) / KYBER_Q));
   neon_one = vdupq_n_s16(1 << 9);
 
   // Scalar variable
@@ -180,6 +163,7 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
     // Load Zeta
     // 64, 65, 66, 67 =-= 68, 69, 70, 71
     neon_zeta = vld1q_s16(&neon_zetas[k]);
+    neon_zeta_qinv = vld1q_s16(&neon_zetas_qinv[k]);
 
     // Use max 8 registers
     // 0: 0, 4,  8, 12, =-=  16, 20, 24, 28
@@ -195,10 +179,10 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
     // => r.val[3] = a.val[2]*b.val[3] + a.val[3] * b.val[2]
 
     fqmul(ta.val[0], aa.val[1], bb.val[1], t);
-    fqmul(ta.val[0], ta.val[0], neon_zeta, t);
+    fqmul_qinv(ta.val[0], ta.val[0], neon_zeta, neon_zeta_qinv, t);
     fqmul(ta.val[1], aa.val[0], bb.val[1], t);
     fqmul(ta.val[2], aa.val[3], bb.val[3], t);
-    fqmul(ta.val[2], ta.val[2], neon_zeta, t);
+    fqmul_qinv(ta.val[2], ta.val[2], neon_zeta, neon_zeta_qinv, t);
     fqmul(ta.val[3], aa.val[2], bb.val[3], t);
 
     fqmul(tb.val[0], aa.val[0], bb.val[0], t);
@@ -218,10 +202,10 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
     vload4(bb, &b->vec[1].coeffs[j]);
 
     fqmul(ta.val[0], aa.val[1], bb.val[1], t);
-    fqmul(ta.val[0], ta.val[0], neon_zeta, t);
+    fqmul_qinv(ta.val[0], ta.val[0], neon_zeta, neon_zeta_qinv, t);
     fqmul(ta.val[1], aa.val[0], bb.val[1], t);
     fqmul(ta.val[2], aa.val[3], bb.val[3], t);
-    fqmul(ta.val[2], ta.val[2], neon_zeta, t);
+    fqmul_qinv(ta.val[2], ta.val[2], neon_zeta, neon_zeta_qinv, t);
     fqmul(ta.val[3], aa.val[2], bb.val[3], t);
 
     vadd8(r.val[0], r.val[0], ta.val[0]);
@@ -247,10 +231,10 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
     vload4(bb, &b->vec[2].coeffs[j]);
 
     fqmul(ta.val[0], aa.val[1], bb.val[1], t);
-    fqmul(ta.val[0], ta.val[0], neon_zeta, t);
+    fqmul_qinv(ta.val[0], ta.val[0], neon_zeta, neon_zeta_qinv, t);
     fqmul(ta.val[1], aa.val[0], bb.val[1], t);
     fqmul(ta.val[2], aa.val[3], bb.val[3], t);
-    fqmul(ta.val[2], ta.val[2], neon_zeta, t);
+    fqmul_qinv(ta.val[2], ta.val[2], neon_zeta, neon_zeta_qinv, t);
     fqmul(ta.val[3], aa.val[2], bb.val[3], t);
 
     vadd8(r.val[0], r.val[0], ta.val[0]);
@@ -274,10 +258,10 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
     vload4(bb, &b->vec[3].coeffs[j]);
 
     fqmul(ta.val[0], aa.val[1], bb.val[1], t);
-    fqmul(ta.val[0], ta.val[0], neon_zeta, t);
+    fqmul_qinv(ta.val[0], ta.val[0], neon_zeta, neon_zeta_qinv, t);
     fqmul(ta.val[1], aa.val[0], bb.val[1], t);
     fqmul(ta.val[2], aa.val[3], bb.val[3], t);
-    fqmul(ta.val[2], ta.val[2], neon_zeta, t);
+    fqmul_qinv(ta.val[2], ta.val[2], neon_zeta, neon_zeta_qinv, t);
     fqmul(ta.val[3], aa.val[2], bb.val[3], t);
 
     vadd8(r.val[0], r.val[0], ta.val[0]);
@@ -305,12 +289,13 @@ void neon_polyvec_acc_montgomery(poly *c, const polyvec *a, const polyvec *b, co
     if (to_mont)
     {
       neon_zeta = vdupq_n_s16(((1ULL << 32) % KYBER_Q));
+      neon_zeta_qinv = vdupq_n_s16( (int16_t) (((1ULL << 32) % KYBER_Q) * QINV));
 
       // Split fqmul
-      fqmul(r.val[0], r.val[0], neon_zeta, t);
-      fqmul(r.val[1], r.val[1], neon_zeta, t);
-      fqmul(r.val[2], r.val[2], neon_zeta, t);
-      fqmul(r.val[3], r.val[3], neon_zeta, t);
+      fqmul_qinv(r.val[0], r.val[0], neon_zeta, neon_zeta_qinv, t);
+      fqmul_qinv(r.val[1], r.val[1], neon_zeta, neon_zeta_qinv, t);
+      fqmul_qinv(r.val[2], r.val[2], neon_zeta, neon_zeta_qinv, t);
+      fqmul_qinv(r.val[3], r.val[3], neon_zeta, neon_zeta_qinv, t);
     }
 
     vstore4(&c->coeffs[j], r);
