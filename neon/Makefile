@@ -6,6 +6,8 @@ NISTFLAGS += -Wno-unused-result -mpopcnt -maes \
    -mtune=native -O3 -fomit-frame-pointer
 RM = /bin/rm
 # LIBPAPI = lib/libpapi.a
+LDFLAGS = -L/opt/homebrew/opt/openssl@1.1/lib
+CPPFLAGS =-I/opt/homebrew/opt/openssl@1.1/include
 
 SOURCES = kex.c kem.c indcpa.c polyvec.c neon_polyvec.c poly.c neon_poly.c neon_ntt.c cbd.c reduce.c  verify.c
 SOURCESKECCAK = $(SOURCES) fips202x2.c fips202.c neon_symmetric-shake.c symmetric-shake.c rejsample.c
@@ -182,13 +184,13 @@ test_speed_ntt: neon_ntt.c reduce.c neon_ntt.c speed_ntt.c
 # 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=4 $(SOURCESNINETIES) randombytes.c cpucycles.c kex.c fips202.c speed_print.c test_speed.c -o test_speed1024-90s
 
 PQCgenKAT_kem512: $(SOURCESKECCAK) $(HEADERSKECCAK) PQCgenKAT_kem.c rng.c rng.h
-		$(CC) $(NISTFLAGS) -DKYBER_K=2 -o $@ $(SOURCESKECCAK) rng.c PQCgenKAT_kem.c $(LDFLAGS) -lcrypto
+		$(CC) $(NISTFLAGS) -DKYBER_K=2 -o $@ $(SOURCESKECCAK) rng.c PQCgenKAT_kem.c $(LDFLAGS) $(CPPFLAGS) -lcrypto
 
 PQCgenKAT_kem768: $(SOURCESKECCAK) $(HEADERSKECCAK) PQCgenKAT_kem.c rng.c rng.h
-		$(CC) $(NISTFLAGS) -DKYBER_K=3 -o $@ $(SOURCESKECCAK) rng.c PQCgenKAT_kem.c $(LDFLAGS) -lcrypto
+		$(CC) $(NISTFLAGS) -DKYBER_K=3 -o $@ $(SOURCESKECCAK) rng.c PQCgenKAT_kem.c $(LDFLAGS) $(CPPFLAGS) -lcrypto
 
 PQCgenKAT_kem1024: $(SOURCESKECCAK) $(HEADERSKECCAK) PQCgenKAT_kem.c rng.c rng.h
-		$(CC) $(NISTFLAGS) -DKYBER_K=4 -o $@ $(SOURCESKECCAK) rng.c PQCgenKAT_kem.c $(LDFLAGS) -lcrypto
+		$(CC) $(NISTFLAGS) -DKYBER_K=4 -o $@ $(SOURCESKECCAK) rng.c PQCgenKAT_kem.c $(LDFLAGS) $(CPPFLAGS) -lcrypto
 
 # PQCgenKAT_kem512-90s: $(SOURCESNINETIES) $(HEADERSNINETIES) PQCgenKAT_kem.c rng.c rng.h
 # 		$(CC) $(NISTFLAGS) -DKYBER_K=2 -DKYBER_90S -o $@ $(SOURCESNINETIES) rng.c PQCgenKAT_kem.c $(LDFLAGS) -lcrypto
