@@ -1,9 +1,9 @@
-CC ?= /usr/bin/cc
+CC = clang 
 CFLAGS += -Wall -Wextra -Wpedantic -Wmissing-prototypes -Wredundant-decls \
   -Wshadow -Wpointer-arith -O3 -fomit-frame-pointer -mtune=native
 NISTFLAGS += -Wno-unused-result -O3 -fomit-frame-pointer
 RM = /bin/rm
-# LIBPAPI = lib/libpapi.a
+LIBPAPI = lib/libpapi.a
 LDFLAGS = -L/opt/homebrew/opt/openssl@1.1/lib
 CPPFLAGS =-I/opt/homebrew/opt/openssl@1.1/include
 
@@ -37,15 +37,17 @@ all: \
   test_vectors1024-90s
 
 speed: \
-  test_speed512_macos \
-  test_speed768_macos \
-  test_speed1024_macos
-#   test_speed512 \
-#   test_speed768 \
-#   test_speed1024
+  test_speed512 \
+  test_speed768 \
+  test_speed1024
 #   test_speed512-90s \
 #   test_speed768-90s \
 #   test_speed1024-90s
+
+speed_macos: \
+  test_speed512_macos \
+  test_speed768_macos \
+  test_speed1024_macos
 
 speed_keccak: \
   test_speed512keccak \
@@ -118,13 +120,13 @@ test_speed1024: $(SOURCESKECCAK) $(HEADERSKECCAK)  test_speed_region.c randombyt
 		$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) cpucycles.c randombytes.c  test_speed_region.c $(LIBPAPI) -o test_speed1024
 
 test_speed512_macos: $(SOURCESKECCAK) $(HEADERSKECCAK)  test_speed_region_macos.c randombytes.c m1cycles.c
-		$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) m1cycles.c randombytes.c  test_speed_region_macos.c $(LIBPAPI) -o test_speed512_macos
+		$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) m1cycles.c randombytes.c  test_speed_region_macos.c -o test_speed512_macos
 
 test_speed768_macos: $(SOURCESKECCAK) $(HEADERSKECCAK)  test_speed_region_macos.c randombytes.c m1cycles.c
-		$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) m1cycles.c randombytes.c  test_speed_region_macos.c $(LIBPAPI) -o test_speed768_macos
+		$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) m1cycles.c randombytes.c  test_speed_region_macos.c -o test_speed768_macos
 
 test_speed1024_macos: $(SOURCESKECCAK) $(HEADERSKECCAK)  test_speed_region_macos.c randombytes.c m1cycles.c
-		$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) m1cycles.c randombytes.c  test_speed_region_macos.c $(LIBPAPI) -o test_speed1024_macos
+		$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) m1cycles.c randombytes.c  test_speed_region_macos.c -o test_speed1024_macos
 
 test_speed512keccak: $(SOURCESKECCAK) $(HEADERSKECCAK)  test_speed_keccak.c randombytes.c
 		$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c  test_speed_keccak.c $(LIBPAPI) -o test_speed512keccak
@@ -239,7 +241,11 @@ clean:
 
 
 bench:
-	./test_speed512 
-	./test_speed768
-	./test_speed1024
-	echo "DONE"	
+	./test_speed512 ; cat papi_hl_output/rank* | grep TOT_CYC
+	./test_speed768 ; cat papi_hl_output/rank* | grep TOT_CYC
+	./test_speed1024 ; cat papi_hl_output/rank* | grep TOT_CYC
+
+bench_os:
+	./test_speed512_macos
+	./test_speed768_macos
+	./test_speed1024_macos

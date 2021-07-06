@@ -1,11 +1,9 @@
-#CC ?= /usr/bin/cc -march=native
-CC ?= /usr/bin/cc
+CC = clang
 CFLAGS += -Wall -Wextra -Wpedantic -Wmissing-prototypes -Wredundant-decls \
   -Wshadow -Wpointer-arith -fomit-frame-pointer -mtune=native -O3
-NISTFLAGS += -Wno-unused-result -mpopcnt -maes \
-   -mtune=native -O3 -fomit-frame-pointer
+NISTFLAGS += -Wno-unused-result -mpopcnt -maes -mtune=native -O3 -fomit-frame-pointer
 RM = /bin/rm
-# LIBPAPI = lib/libpapi.a
+LIBPAPI = lib/libpapi.a
 LDFLAGS = -L/opt/homebrew/opt/openssl@1.1/lib
 CPPFLAGS =-I/opt/homebrew/opt/openssl@1.1/include
 
@@ -39,16 +37,15 @@ all: \
 #   test_vectors1024-90s
 
 speed: \
+  test_speed512 \
+  test_speed768 \
+  test_speed1024
+
+speed_macos: \
   test_speed512_macos \
   test_speed768_macos \
-  test_speed1024_macos
-#   test_speed512 \
-#   test_speed768 \
-#   test_speed1024
-#   test_speed_ntt
-#   test_speed512-90s \
-#   test_speed768-90s \
-#   test_speed1024-90s
+  test_speed1024_macos \
+  test_speed_ntt
 
 speed_keccak: \
   test_speed512keccak \
@@ -66,122 +63,122 @@ shared: \
   libpqcrystals_sha2_neon.so
 
 libpqcrystals_fips202_neon.so: fips202.c fips202.h
-	$(CC) -shared -fPIC $(CFLAGS) fips202.c -o libpqcrystals_fips202_neon.so
+	$(CC) -shared -fPIC $(CFLAGS) fips202.c -o $@ 
 
 libpqcrystals_sha2_neon.so: sha256.c sha512.c sha2.h
-	$(CC) -shared -fPIC $(CFLAGS) sha256.c sha512.c -o libpqcrystals_sha2_neon.so
+	$(CC) -shared -fPIC $(CFLAGS) sha256.c sha512.c -o $@ 
 
 libpqcrystals_kyber512_neon.so: $(SOURCES) $(HEADERS) symmetric-shake.c
-	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=2 $(SOURCES) symmetric-shake.c -o libpqcrystals_kyber512_neon.so
+	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=2 $(SOURCES) symmetric-shake.c -o $@ 
 
 libpqcrystals_kyber768_neon.so: $(SOURCES) $(HEADERS) symmetric-shake.c
-	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=3 $(SOURCES) symmetric-shake.c -o libpqcrystals_kyber768_neon.so
+	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=3 $(SOURCES) symmetric-shake.c -o $@ 
 
 libpqcrystals_kyber1024_neon.so: $(SOURCES) $(HEADERS) symmetric-shake.c
-	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=4 $(SOURCES) symmetric-shake.c -o libpqcrystals_kyber1024_neon.so
+	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=4 $(SOURCES) symmetric-shake.c -o $@ 
 
 test_kyber512: $(SOURCESKECCAK) $(HEADERSKECCAK) test_kyber.c randombytes.c
-	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c test_kyber.c -o test_kyber512
+	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c test_kyber.c -o $@ 
 
 test_kyber768: $(SOURCESKECCAK) $(HEADERSKECCAK) test_kyber.c randombytes.c
-	$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) randombytes.c test_kyber.c -o test_kyber768
+	$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) randombytes.c test_kyber.c -o $@ 
 
 test_kyber1024: $(SOURCESKECCAK) $(HEADERSKECCAK) test_kyber.c randombytes.c
-	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c test_kyber.c -o test_kyber1024
+	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c test_kyber.c -o $@ 
 
 test_kex512: $(SOURCESKECCAK) $(HEADERSKECCAK) test_kex.c randombytes.c
-	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c test_kex.c -o test_kex512
+	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c test_kex.c -o $@ 
 
 test_kex768: $(SOURCESKECCAK) $(HEADERSKECCAK) test_kex.c randombytes.c
-	$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) randombytes.c test_kex.c -o test_kex768
+	$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) randombytes.c test_kex.c -o $@ 
 
 test_kex1024: $(SOURCESKECCAK) $(HEADERSKECCAK) test_kex.c randombytes.c
-	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c test_kex.c -o test_kex1024
+	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c test_kex.c -o $@ 
 
 test_vectors512: $(SOURCESKECCAK) $(HEADERSKECCAK) test_vectors.c
-	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) test_vectors.c -o test_vectors512
+	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) test_vectors.c -o $@ 
 
 test_vectors768: $(SOURCESKECCAK) $(HEADERSKECCAK) test_vectors.c
-	$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) test_vectors.c -o test_vectors768
+	$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) test_vectors.c -o $@ 
 
 test_vectors1024: $(SOURCESKECCAK) $(HEADERSKECCAK) test_vectors.c
-	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) test_vectors.c -o test_vectors1024
+	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) test_vectors.c -o $@ 
 
 test_speed512: $(SOURCESKECCAK) $(HEADERSKECCAK) test_speed_region.c randombytes.c
-	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c test_speed_region.c $(LIBPAPI) -o test_speed512
+	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c test_speed_region.c $(LIBPAPI) -o $@ 
 
 test_speed768: $(SOURCESKECCAK) $(HEADERSKECCAK) test_speed_region.c randombytes.c
-	$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) randombytes.c test_speed_region.c $(LIBPAPI) -o test_speed768
+	$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) randombytes.c test_speed_region.c $(LIBPAPI) -o $@ 
 
 test_speed1024: $(SOURCESKECCAK) $(HEADERSKECCAK) test_speed_region.c randombytes.c
-	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c test_speed_region.c $(LIBPAPI) -o test_speed1024
+	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c test_speed_region.c $(LIBPAPI) -o $@ 
 
 test_speed512_macos: $(SOURCESKECCAK) $(HEADERSKECCAK) test_speed_region_macos.c randombytes.c m1cycles.c
-	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) m1cycles.c randombytes.c test_speed_region_macos.c $(LIBPAPI) -o test_speed512_macos
+	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) m1cycles.c randombytes.c test_speed_region_macos.c $(LIBPAPI) -o $@ 
 
 test_speed768_macos: $(SOURCESKECCAK) $(HEADERSKECCAK) test_speed_region_macos.c randombytes.c m1cycles.c
-	$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) m1cycles.c randombytes.c test_speed_region_macos.c $(LIBPAPI) -o test_speed768_macos
+	$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) m1cycles.c randombytes.c test_speed_region_macos.c $(LIBPAPI) -o $@ 
 
 test_speed1024_macos: $(SOURCESKECCAK) $(HEADERSKECCAK) test_speed_region_macos.c randombytes.c m1cycles.c
-	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) m1cycles.c randombytes.c test_speed_region_macos.c $(LIBPAPI) -o test_speed1024_macos
+	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) m1cycles.c randombytes.c test_speed_region_macos.c $(LIBPAPI) -o $@ 
 
 
 test_speed512keccak: $(SOURCESKECCAK) $(HEADERSKECCAK) speed_print.h speed_print.c test_speed_keccak.c randombytes.c
-	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c test_speed_keccak.c $(LIBPAPI) -o test_speed512keccak
+	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) randombytes.c test_speed_keccak.c $(LIBPAPI) -o $@ 
 
 test_speed768keccak: $(SOURCESKECCAK) $(HEADERSKECCAK) speed_print.h speed_print.c test_speed_keccak.c randombytes.c
-	$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) randombytes.c test_speed_keccak.c $(LIBPAPI) -o test_speed768keccak
+	$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) randombytes.c test_speed_keccak.c $(LIBPAPI) -o $@ 
 
 test_speed1024keccak: $(SOURCESKECCAK) $(HEADERSKECCAK) speed_print.h speed_print.c test_speed_keccak.c randombytes.c
-	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c test_speed_keccak.c $(LIBPAPI) -o test_speed1024keccak
+	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c test_speed_keccak.c $(LIBPAPI) -o $@ 
 
-test_speed_ntt: neon_ntt.c reduce.c neon_ntt.c speed_ntt.c
-	$(CC) $(CFLAGS) reduce.c neon_ntt.c speed_ntt.c $(LIBPAPI) -o test_speed_ntt
+test_speed_ntt: neon_ntt.c reduce.c improve-inv-ntt.c improve-ntt.c test_new_ntt.c
+	$(CC) $(CFLAGS) reduce.c neon_ntt.c speed_ntt.c $(LIBPAPI) -o $@ 
 
 # libpqcrystals_kyber512-90s_neon.so: $(SOURCES) $(HEADERS) symmetric-aes.c
-# 	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=2 -DKYBER_90S $(SOURCES) symmetric-aes.c -o libpqcrystals_kyber512-90s_neon.so
+# 	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=2 -DKYBER_90S $(SOURCES) symmetric-aes.c -o $@ 
 
 # libpqcrystals_kyber768-90s_neon.so: $(SOURCES) $(HEADERS) symmetric-aes.c
-# 	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=3 -DKYBER_90S $(SOURCES) symmetric-aes.c -o libpqcrystals_kyber768-90s_neon.so
+# 	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=3 -DKYBER_90S $(SOURCES) symmetric-aes.c -o $@ 
 
 # libpqcrystals_kyber1024-90s_neon.so: $(SOURCES) $(HEADERS) symmetric-aes.c
-# 	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=4 -DKYBER_90S $(SOURCES) symmetric-aes.c -o libpqcrystals_kyber1024-90s_neon.so
+# 	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=4 -DKYBER_90S $(SOURCES) symmetric-aes.c -o $@ 
 
 # test_kyber512-90s: $(SOURCESNINETIES) $(HEADERSNINETIES) test_kyber.c randombytes.c
-# 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=2 $(SOURCESNINETIES) randombytes.c test_kyber.c -o test_kyber512-90s
+# 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=2 $(SOURCESNINETIES) randombytes.c test_kyber.c -o $@ 
 
 # test_kyber768-90s: $(SOURCESNINETIES) $(HEADERSNINETIES) test_kyber.c randombytes.c
-# 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=3 $(SOURCESNINETIES) randombytes.c test_kyber.c -o test_kyber768-90s
+# 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=3 $(SOURCESNINETIES) randombytes.c test_kyber.c -o $@ 
 
 # test_kyber1024-90s: $(SOURCESNINETIES) $(HEADERSNINETIES) test_kyber.c randombytes.c
-# 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=4 $(SOURCESNINETIES) randombytes.c test_kyber.c -o test_kyber1024-90s
+# 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=4 $(SOURCESNINETIES) randombytes.c test_kyber.c -o $@ 
 
 # test_kex512-90s: $(SOURCESNINETIES) $(HEADERSNINETIES) test_kex.c randombytes.c fips202.c fips202.h
-# 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=2 $(SOURCESNINETIES) randombytes.c fips202.c kex.c test_kex.c -o test_kex512-90s
+# 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=2 $(SOURCESNINETIES) randombytes.c fips202.c kex.c test_kex.c -o $@ 
 
 # test_kex768-90s: $(SOURCESNINETIES) $(HEADERSNINETIES) test_kex.c randombytes.c fips202.c fips202.h
-# 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=3 $(SOURCESNINETIES) randombytes.c fips202.c kex.c test_kex.c -o test_kex768-90s
+# 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=3 $(SOURCESNINETIES) randombytes.c fips202.c kex.c test_kex.c -o $@ 
 
 # test_kex1024-90s: $(SOURCESNINETIES) $(HEADERSNINETIES) test_kex.c randombytes.c fips202.c fips202.h
-# 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=4 $(SOURCESNINETIES) randombytes.c fips202.c kex.c test_kex.c -o test_kex1024-90s
+# 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=4 $(SOURCESNINETIES) randombytes.c fips202.c kex.c test_kex.c -o $@ 
 
 # test_vectors512-90s: $(SOURCESNINETIES) $(HEADERSNINETIES) test_vectors.c
-# 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=2 $(SOURCESNINETIES) test_vectors.c -o test_vectors512-90s
+# 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=2 $(SOURCESNINETIES) test_vectors.c -o $@ 
 
 # test_vectors768-90s: $(SOURCESNINETIES) $(HEADERSNINETIES) test_vectors.c
-# 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=3 $(SOURCESNINETIES) test_vectors.c -o test_vectors768-90s
+# 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=3 $(SOURCESNINETIES) test_vectors.c -o $@ 
 
 # test_vectors1024-90s: $(SOURCESNINETIES) $(HEADERSNINETIES) test_vectors.c
-# 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=4 $(SOURCESNINETIES) test_vectors.c -o test_vectors1024-90s
+# 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=4 $(SOURCESNINETIES) test_vectors.c -o $@ 
 
 # test_speed512-90s: $(SOURCESNINETIES) $(HEADERSNINETIES) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed.c randombytes.c  fips202.c fips202.h
-# 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=2 $(SOURCESNINETIES) randombytes.c cpucycles.c kex.c fips202.c speed_print.c test_speed.c -o test_speed512-90s
+# 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=2 $(SOURCESNINETIES) randombytes.c cpucycles.c kex.c fips202.c speed_print.c test_speed.c -o $@ 
 
 # test_speed768-90s: $(SOURCESNINETIES) $(HEADERSNINETIES) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed.c randombytes.c  fips202.c fips202.h
-# 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=3 $(SOURCESNINETIES) randombytes.c cpucycles.c kex.c fips202.c speed_print.c test_speed.c -o test_speed768-90s
+# 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=3 $(SOURCESNINETIES) randombytes.c cpucycles.c kex.c fips202.c speed_print.c test_speed.c -o $@ 
 
 # test_speed1024-90s: $(SOURCESNINETIES) $(HEADERSNINETIES) cpucycles.h cpucycles.c speed_print.h speed_print.c test_speed.c randombytes.c  fips202.c fips202.h
-# 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=4 $(SOURCESNINETIES) randombytes.c cpucycles.c kex.c fips202.c speed_print.c test_speed.c -o test_speed1024-90s
+# 	$(CC) $(CFLAGS) -D KYBER_90S -DKYBER_K=4 $(SOURCESNINETIES) randombytes.c cpucycles.c kex.c fips202.c speed_print.c test_speed.c -o $@ 
 
 PQCgenKAT_kem512: $(SOURCESKECCAK) $(HEADERSKECCAK) PQCgenKAT_kem.c rng.c rng.h
 		$(CC) $(NISTFLAGS) -DKYBER_K=2 -o $@ $(SOURCESKECCAK) rng.c PQCgenKAT_kem.c $(LDFLAGS) $(CPPFLAGS) -lcrypto
@@ -245,12 +242,17 @@ clean:
 	-$(RM) -rf test_speed_ntt
 
 bench:
-	./test_speed512_macos
-	./test_speed768_macos
-	./test_speed1024_macos
-	echo "DONE"
+	./test_speed512 ; cat papi_hl_output/rank* | grep TOT_CYC
+	./test_speed768 ; cat papi_hl_output/rank* | grep TOT_CYC
+	./test_speed1024 ; cat papi_hl_output/rank* | grep TOT_CYC
+	./test_speed_ntt ; cat papi_hl_output/rank* | grep TOT_CYC
 
 bench_keccak:
 	taskset 0x1 ./test_speed512keccak
 	taskset 0x1 ./test_speed768keccak
 	taskset 0x1 ./test_speed1024keccak
+
+bench_os:
+	./test_speed512_macos
+	./test_speed768_macos
+	./test_speed1024_macos
