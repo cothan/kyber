@@ -6,46 +6,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-const int16_t neon_zetas_inv_qinv [272] = {
-23132, -17422, 7756, 23998, -20257, 28644, -23860, 31636, 
--17442, 10906, 23210, -22502, -20198, -7934, -21498, 10335, 
-14469, 16989, -11044, 24214, -14903, 10946, -6280, -20927, 
--32384, 24391, 15355, -7382, 2146, 25435, 20297, -31183, 
--17915, -17915, -17915, -17915, 4311, 4311, 4311, 4311, 
--24155, -24155, -24155, -24155, 16832, 16832, 16832, 16832, 
--12757, -12757, -12757, -12757, 14017, 14017, 14017, 14017, 
--29156, -29156, -29156, -29156, 13426, 13426, 13426, 13426, 
-18249, 18249, 18249, 18249, 9075, 9075, 9075, 9075, 
--30199, -30199, -30199, -30199, -28309, -28309, -28309, -28309, 
--8898, -8898, -8898, -8898, -28250, -28250, -28250, -28250, 
--15887, -15887, -15887, -15887, 19883, 19883, 19883, 19883, 
--16163, -16163, -16163, -16163, 26675, 26675, 26675, 26675, 
-8859, 8859, 8859, 8859, 18426, 18426, 18426, 18426, 
-8800, 8800, 8800, 8800, -10532, -10532, -10532, -10532, 
-24313, 24313, 24313, 24313, -28073, -28073, -28073, -28073, 
-31164, -11202, 1358, 10690, -16694, 28191, 787, 787, 
-
--12619, -5276, 19529, -14430, 18525, 17560, 20100, -18486, 
-12639, -28762, -18741, 29175, 30317, 10631, -32502, 32010, 
-5493, 6182, 23092, -14883, -4587, 945, 13131, -27738, 
--21655, 20494, -14233, -32227, 13387, -11477, 11182, -335, 
-27837, 27837, 27837, 27837, -650, -650, -650, -650, 
--25986, -25986, -25986, -25986, 9134, 9134, 9134, 9134, 
--12442, -12442, -12442, -12442, 26616, 26616, 26616, 26616, 
-16064, 16064, 16064, 16064, -12796, -12796, -12796, -12796, 
-25080, 25080, 25080, 25080, 20179, 20179, 20179, 20179, 
-20710, 20710, 20710, 20710, -23565, -23565, -23565, -23565, 
-30967, 30967, 30967, 30967, -6516, -6516, -6516, -6516, 
-1496, 1496, 1496, 1496, -5689, -5689, -5689, -5689, 
--26242, -26242, -26242, -26242, 21438, 21438, 21438, 21438, 
--1102, -1102, -1102, -1102, 5571, 5571, 5571, 5571, 
--29057, -29057, -29057, -29057, -26360, -26360, -26360, -26360, 
-17363, 17363, 17363, 17363, -5827, -5827, -5827, -5827, 
--15690, -3799, 27758, -20907, -12402, 13525, 14745, 5237, 
-};
-
-
-
 /*************************************************/
 // Load int16x8_t c <= ptr*
 #define vload(c, ptr) c = vld1q_s16(ptr);
@@ -105,24 +65,24 @@ int16_t fqmul(int16_t b, int16_t c) {
   return t_H - a_H;
 }
 *************************************************/
-#define fqmul1(out, in, zeta, t)                                                                 \
-    t.val[0] = (int16x8_t)vqdmulhq_s16(in, zeta);                  /* (2*a)_H */                 \
-    t.val[1] = (int16x8_t)vmulq_s16(in, zeta);                     /* a_L */                     \
-    t.val[2] = vmulq_s16(t.val[1], neon_qinv);                     /* a_L = a_L * QINV */        \
-    t.val[3] = (int16x8_t)vqdmulhq_s16(t.val[2], neon_kyberq);     /* (2*a_L*Q)_H */             \
-    out = vhsubq_s16(t.val[0], t.val[3]);                          /* ((2*a)_H - (2*a_L*Q)_H)/2 */
+#define fqmul1(out, in, zeta, t)                                                    \
+  t.val[0] = (int16x8_t)vqdmulhq_s16(in, zeta);              /* (2*a)_H */          \
+  t.val[1] = (int16x8_t)vmulq_s16(in, zeta);                 /* a_L */              \
+  t.val[2] = vmulq_s16(t.val[1], neon_qinv);                 /* a_L = a_L * QINV */ \
+  t.val[3] = (int16x8_t)vqdmulhq_s16(t.val[2], neon_kyberq); /* (2*a_L*Q)_H */      \
+  out = vhsubq_s16(t.val[0], t.val[3]);                      /* ((2*a)_H - (2*a_L*Q)_H)/2 */
 
 #define fqmul2(out, in, zeta, zeta_qinv, t)                         \
-  t.val[0] = vqdmulhq_s16(in, zeta);   /* (2*a)_H */                \
-  t.val[1] = vmulq_s16(zeta_qinv, in); /* a_L */                    \
+  t.val[0] = vqdmulhq_s16(in, zeta);              /* (2*a)_H */     \
+  t.val[1] = vmulq_s16(zeta_qinv, in);            /* a_L */         \
   t.val[2] = vqdmulhq_s16(t.val[1], neon_kyberq); /* (2*a_L*Q)_H */ \
   out = vhsubq_s16(t.val[0], t.val[2]);           /* ((2*a)_H - (2*a_L*Q)_H)/2 */
 
-#define fqmul2_lane(out, in, zeta, zeta_qinv, t, lane)                         \
-  t.val[0] = vqdmulhq_laneq_s16(in, zeta, lane);   /* (2*a)_H */                \
-  t.val[1] = vmulq_laneq_s16(in, zeta_qinv, lane); /* a_L */                    \
-  t.val[2] = vqdmulhq_s16(t.val[1], neon_kyberq); /* (2*a_L*Q)_H */ \
-  out = vhsubq_s16(t.val[0], t.val[2]);           /* ((2*a)_H - (2*a_L*Q)_H)/2 */
+#define fqmul2_lane(out, in, zeta, zeta_qinv, t, lane)               \
+  t.val[0] = vqdmulhq_laneq_s16(in, zeta, lane);   /* (2*a)_H */     \
+  t.val[1] = vmulq_laneq_s16(in, zeta_qinv, lane); /* a_L */         \
+  t.val[2] = vqdmulhq_s16(t.val[1], neon_kyberq);  /* (2*a_L*Q)_H */ \
+  out = vhsubq_s16(t.val[0], t.val[2]);            /* ((2*a)_H - (2*a_L*Q)_H)/2 */
 
 /*
 inout: int16x4_t
@@ -141,13 +101,11 @@ int16_t barrett_reduce(int16_t a) {
   t_H = a - t_H * KYBER_Q;
 }
 */
-#define barrett1(inout, t, i)                                                 \
-  t.val[i] = vqrdmulhq_s16(inout, neon_v);  /* (2*a*v)_H */                                    \
-  t.val[i + 1] = vhaddq_s16(t.val[i], neon_one); /* (2a*v + 2) */                              \
-  t.val[i + 1] = vshrq_n_s16(t.val[i + 1], 10);                               \
+#define barrett1(inout, t, i)                                     \
+  t.val[i] = vqdmulhq_s16(inout, neon_v);        /* (2*a*v)_H */  \
+  t.val[i + 1] = vhaddq_s16(t.val[i], neon_one); /* (2a*v + 2) */ \
+  t.val[i + 1] = vshrq_n_s16(t.val[i + 1], 10);                   \
   inout = vmlsq_s16(inout, t.val[i + 1], neon_kyberq);
-
-
 
 /*
 v1, v2: int16x8_t 
@@ -155,7 +113,7 @@ out1, out2: int16x8_t
 t32_1, t32_2: int32x4_t 
 t16: int16x8_t
 */
-#define barrett_lo(v1, v2, t, i)                                                   \
+#define barrett_lo(v1, v2, t, i)                                                  \
   t.val[i] = (int16x8_t)vmull_s16(vget_low_s16(v1), vget_low_s16(neon_v));        \
   t.val[i + 1] = (int16x8_t)vmull_s16(vget_low_s16(v2), vget_low_s16(neon_v));    \
   t.val[i] = vuzp2q_s16(t.val[i], t.val[i + 1]);                                  \
@@ -256,8 +214,8 @@ void test_neon_invntt(int16_t r[256])
   int j, k = 0;
   // Register: Total 24 + 4(const) = 28
   int16x8x4_t t, v0, v1, v2, v3, z; // 24
-  // End
   int16x8_t neon_v, neon_qinv, neon_kyberq, neon_one;
+  // End
   neon_qinv = vdupq_n_s16(QINV);
   neon_kyberq = vdupq_n_s16(KYBER_Q);
   neon_v = vdupq_n_s16(((1U << 26) + KYBER_Q / 2) / KYBER_Q);
@@ -340,7 +298,6 @@ void test_neon_invntt(int16_t r[256])
     addsub(v1, 0, 2, 1, 3, t, 2);
     addsub(v2, 0, 2, 1, 3, t, 0);
     addsub(v3, 0, 2, 1, 3, t, 2);
-
 
     vloadx4(z, &neon_zetas_inv[k + 96]);
 
@@ -499,20 +456,19 @@ void test_neon_invntt(int16_t r[256])
   }
 }
 
-
 void test_neon_invntt_qinv(int16_t r[256])
 {
   int j, k = 0;
   // Register: Total 24 + 4(const) = 28
   int16x8x4_t t, v0, v1, v2, v3, z, z_qinv; // 24
-  // End
   int16x8_t neon_v, neon_qinv, neon_kyberq, neon_one;
+  // End
   neon_qinv = vdupq_n_s16(QINV);
   neon_kyberq = vdupq_n_s16(KYBER_Q);
   neon_v = vdupq_n_s16(((1U << 26) + KYBER_Q / 2) / KYBER_Q);
   neon_one = vdupq_n_s16(1 << 9);
 
-  const int16_t f = 1441; // mont^2/128
+  const int16_t f = 1441;        // mont^2/128
   const int16_t f_qinv = -10079; // f*qinv & 0xffff
 
   // *Vectorize* barret_reduction over *64* points rather than 896=128*7 points
@@ -568,8 +524,7 @@ void test_neon_invntt_qinv(int16_t r[256])
     addsub(v3, 0, 1, 2, 3, t, 2);
 
     vloadx4(z, &neon_zetas_inv[k + 32]);
-    vloadx4(z_qinv, &neon_zetas_inv_qinv[k+32]);
-
+    vloadx4(z_qinv, &neon_zetas_inv_qinv[k + 32]);
 
     fqmul2(v0.val[1], v0.val[1], z.val[0], z_qinv.val[0], t);
     fqmul2(v0.val[3], v0.val[3], z.val[1], z_qinv.val[1], t);
@@ -594,7 +549,6 @@ void test_neon_invntt_qinv(int16_t r[256])
     addsub(v1, 0, 2, 1, 3, t, 2);
     addsub(v2, 0, 2, 1, 3, t, 0);
     addsub(v3, 0, 2, 1, 3, t, 2);
-
 
     vloadx4(z, &neon_zetas_inv[k + 96]);
     vloadx4(z_qinv, &neon_zetas_inv_qinv[k + 96]);
@@ -716,7 +670,7 @@ void test_neon_invntt_qinv(int16_t r[256])
   z.val[1] = vdupq_n_s16(f);
 
   z_qinv.val[0] = vdupq_n_s16(neon_zetas_inv_qinv[271]);
-  z_qinv.val[1] = vdupq_n_s16( f_qinv);
+  z_qinv.val[1] = vdupq_n_s16(f_qinv);
 
   // After layer 7, no need for barrett_reduction
   for (j = 0; j < 128; j += 64)
@@ -765,20 +719,19 @@ void test_neon_invntt_qinv(int16_t r[256])
   }
 }
 
-
 void test_neon_invntt_qinv_lane(int16_t r[256])
 {
   int j, k = 0;
   // Register: Total 24 + 4(const) = 28
   int16x8x4_t t, v0, v1, v2, v3, z, z_qinv; // 24
-  int16x8_t z2, z2_qinv;                  // 2
-  // End
+  int16x8_t z2, z2_qinv;                    // 2
   int16x8_t neon_v, neon_kyberq, neon_one;
+  // End
   neon_kyberq = vdupq_n_s16(KYBER_Q);
   neon_v = vdupq_n_s16(((1U << 26) + KYBER_Q / 2) / KYBER_Q);
   neon_one = vdupq_n_s16(1 << 9);
 
-  const int16_t f = 1441; // mont^2/128
+  const int16_t f = 1441;        // mont^2/128
   const int16_t f_qinv = -10079; // f*qinv & 0xffff
 
   // *Vectorize* barret_reduction over *64* points rather than 896=128*7 points
@@ -834,8 +787,7 @@ void test_neon_invntt_qinv_lane(int16_t r[256])
     addsub(v3, 0, 1, 2, 3, t, 2);
 
     vloadx4(z, &neon_zetas_inv[k + 32]);
-    vloadx4(z_qinv, &neon_zetas_inv_qinv[k+32]);
-
+    vloadx4(z_qinv, &neon_zetas_inv_qinv[k + 32]);
 
     fqmul2(v0.val[1], v0.val[1], z.val[0], z_qinv.val[0], t);
     fqmul2(v0.val[3], v0.val[3], z.val[1], z_qinv.val[1], t);
@@ -860,7 +812,6 @@ void test_neon_invntt_qinv_lane(int16_t r[256])
     addsub(v1, 0, 2, 1, 3, t, 2);
     addsub(v2, 0, 2, 1, 3, t, 0);
     addsub(v3, 0, 2, 1, 3, t, 2);
-
 
     vloadx4(z, &neon_zetas_inv[k + 96]);
     vloadx4(z_qinv, &neon_zetas_inv_qinv[k + 96]);
@@ -896,8 +847,8 @@ void test_neon_invntt_qinv_lane(int16_t r[256])
     // 0, 1, 2, 3: 8 points
     barrett_lo(v1.val[0], v3.val[0], t, 0);
 
-    z2 = vld1q_s16(&neon_zetas_inv[k+128]);
-    z2_qinv = vld1q_s16(&neon_zetas_inv_qinv[k+128]);
+    z2 = vld1q_s16(&neon_zetas_inv[k + 128]);
+    z2_qinv = vld1q_s16(&neon_zetas_inv_qinv[k + 128]);
 
     fqmul2_lane(v0.val[2], v0.val[2], z2, z2_qinv, t, 0);
     fqmul2_lane(v0.val[3], v0.val[3], z2, z2_qinv, t, 0);
@@ -1012,5 +963,3 @@ void test_neon_invntt_qinv_lane(int16_t r[256])
     vstorex4(&r[j + 160], v3);
   }
 }
-
-

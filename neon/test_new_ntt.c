@@ -27,8 +27,7 @@ static int compare_array(int16_t a[KYBER_N], int16_t b[KYBER_N], const char *str
     return ret;
 }
 
-static
-int check_ntt(void)
+static int check_ntt(void)
 {
     int16_t test_ntt[KYBER_N], test_ntt_qinv[KYBER_N], gold_ntt[KYBER_N], test_ntt_qinv_lane[KYBER_N];
     int16_t temp;
@@ -63,8 +62,7 @@ int check_ntt(void)
     return ret;
 }
 
-static
-int check_invntt(void)
+static int check_invntt(void)
 {
     int16_t test_ntt[KYBER_N], test_ntt_qinv[KYBER_N], gold_ntt[KYBER_N], test_invntt_qinv_lane[KYBER_N];
     int16_t temp;
@@ -101,7 +99,6 @@ int check_invntt(void)
 int main()
 {
     int16_t test_ntt[KYBER_N], gold_ntt[KYBER_N];
-    int ret = 0;
     long long start, stop, ns;
 
     srand(0);
@@ -125,7 +122,6 @@ int main()
     {
         printf("INV_NTT is OKAY\n");
     }
-
 
     // Benchmark clock cycles
     setup_rdtsc();
