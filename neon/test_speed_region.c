@@ -11,9 +11,9 @@
 #include "neon_ntt.h"
 #include "cpucycles.h"
 
-#define NTESTS 1000000
+#define NTESTS 100000
 
-#define BEGIN(funcname) PAPI_hl_region_begin(funcname);
+#define START(funcname) PAPI_hl_region_begin(funcname);
 #define END(funcname) PAPI_hl_region_end(funcname);
 
 uint8_t seed[KYBER_SYMBYTES] = {0};
@@ -49,7 +49,6 @@ int main()
   polyvec matrix[KYBER_K];
   polyvec sp, b;
   poly ap, bp;
-  polyvec sp, b;
 
   long long start, stop;
   long long ns;
