@@ -114,13 +114,13 @@ test_speed1024: $(SOURCESKECCAK) $(HEADERSKECCAK) test_speed_region.c randombyte
 	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c test_speed_region.c $(LIBPAPI) -o $@ 
 
 test_speed512_macos: $(SOURCESKECCAK) $(HEADERSKECCAK) test_speed_region_macos.c randombytes.c m1cycles.c
-	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) m1cycles.c randombytes.c test_speed_region_macos.c $(LIBPAPI) -o $@ 
+	$(CC) $(CFLAGS) -DKYBER_K=2 $(SOURCESKECCAK) m1cycles.c randombytes.c test_speed_region_macos.c -o $@ 
 
 test_speed768_macos: $(SOURCESKECCAK) $(HEADERSKECCAK) test_speed_region_macos.c randombytes.c m1cycles.c
-	$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) m1cycles.c randombytes.c test_speed_region_macos.c $(LIBPAPI) -o $@ 
+	$(CC) $(CFLAGS) -DKYBER_K=3 $(SOURCESKECCAK) m1cycles.c randombytes.c test_speed_region_macos.c -o $@ 
 
 test_speed1024_macos: $(SOURCESKECCAK) $(HEADERSKECCAK) test_speed_region_macos.c randombytes.c m1cycles.c
-	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) m1cycles.c randombytes.c test_speed_region_macos.c $(LIBPAPI) -o $@ 
+	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) m1cycles.c randombytes.c test_speed_region_macos.c -o $@ 
 
 
 test_speed512keccak: $(SOURCESKECCAK) $(HEADERSKECCAK) speed_print.h speed_print.c test_speed_keccak.c randombytes.c
@@ -133,7 +133,7 @@ test_speed1024keccak: $(SOURCESKECCAK) $(HEADERSKECCAK) speed_print.h speed_prin
 	$(CC) $(CFLAGS) -DKYBER_K=4 $(SOURCESKECCAK) randombytes.c test_speed_keccak.c $(LIBPAPI) -o $@ 
 
 test_speed_ntt: neon_ntt.c reduce.c improve-inv-ntt.c improve-ntt.c test_new_ntt.c
-	$(CC) $(CFLAGS) reduce.c neon_ntt.c speed_ntt.c $(LIBPAPI) -o $@ 
+	$(CC) $(CFLAGS) m1cycles.c neon_ntt.c reduce.c improve-inv-ntt.c improve-ntt.c test_new_ntt.c -o $@ 
 
 # libpqcrystals_kyber512-90s_neon.so: $(SOURCES) $(HEADERS) symmetric-aes.c
 # 	$(CC) -shared -fPIC $(CFLAGS) -DKYBER_K=2 -DKYBER_90S $(SOURCES) symmetric-aes.c -o $@ 
@@ -252,7 +252,8 @@ bench_keccak:
 	taskset 0x1 ./test_speed768keccak
 	taskset 0x1 ./test_speed1024keccak
 
-bench_os:
+bench_macos:
 	./test_speed512_macos
 	./test_speed768_macos
 	./test_speed1024_macos
+	./test_speed_ntt
